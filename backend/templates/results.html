@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ManeCourse — Results</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+  {% set nav_current = 'Results' %}
+  {% include '_nav.html' %}
+
+  <h1 class="page-title">Group result</h1>
+  <p>Your group’s most agreed-upon choice (or tie-breaker options).</p>
+
+  <div class="info-box">
+    <strong>Winner:</strong> The Top — $$, American
+  </div>
+
+  <ul class="card-list">
+    <li><a href="{{ url_for('restaurant_detail', restaurant_id=1) }}">The Top</a></li>
+    <li><a href="{{ url_for('restaurant_detail', restaurant_id=2) }}">Satchel’s Pizza</a></li>
+    <li><a href="{{ url_for('restaurant_detail', restaurant_id=3) }}">Dragonfly</a></li>
+  </ul>
+
+  <div class="actions">
+    <a href="{{ url_for('map_page', group_id=group_id) }}" class="btn">View on map</a>
+    <a href="{{ url_for('swipe', group_id=group_id) }}" class="btn btn-secondary">Swipe again (tie)</a>
+  </div>
+</body>
+</html>

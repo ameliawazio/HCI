@@ -20,6 +20,9 @@ form.addEventListener('submit', async (event) => {
 
     const data = await response.json();
     result.textContent = data.message;
+    if (data.success) {
+      window.location.href = '/home';
+    }
   } catch (error) {
     result.textContent = 'Server error. Please try again.';
   }

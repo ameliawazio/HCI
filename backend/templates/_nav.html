@@ -1,0 +1,4 @@
+<nav class="app-nav">
+  <a href="{{ url_for('home') }}" class="nav-home">ManeCourse</a>
+  {% if nav_current %}<span class="nav-current">— {{ nav_current }}</span>{% endif %}
+</nav>

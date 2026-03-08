@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ManeCourse — Swipe</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+  {% set nav_current = 'Voting' %}
+  {% include '_nav.html' %}
+
+  <h1 class="page-title">Swipe on restaurants</h1>
+  <p>Swipe right if you’d eat here, left to skip. (Demo: use the buttons below.)</p>
+
+  <div class="swipe-area">
+    <p>Restaurant card stack — e.g. “The Top”, $$, American</p>
+  </div>
+
+  <div class="swipe-actions">
+    <button type="button" class="btn btn-secondary">Skip</button>
+    <button type="button" class="btn">Yes</button>
+  </div>
+
+  <div class="actions" style="margin-top: 2rem;">
+    <a href="{{ url_for('results', group_id=group_id) }}" class="btn">I’m done — see results</a>
+    <a href="{{ url_for('group_settings', group_id=group_id) }}" class="btn btn-secondary">Back to settings</a>
+  </div>
+</body>
+</html>

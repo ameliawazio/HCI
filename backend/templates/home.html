@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ManeCourse — Home</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+  {% set nav_current = 'Home' %}
+  {% include '_nav.html' %}
+  <h1 class="page-title">My groups</h1>
+  <p>Create a new group or join one with a code.</p>
+
+  <div class="actions">
+    <a href="{{ url_for('group_settings', group_id=1) }}" class="btn">Create group</a>
+    <a href="{{ url_for('group_settings', group_id=1) }}" class="btn btn-secondary">Join group (demo)</a>
+  </div>
+
+  <h2>Your groups</h2>
+  <ul class="card-list">
+    <li><a href="{{ url_for('group_settings', group_id=1) }}">Lunch Crew</a></li>
+    <li><a href="{{ url_for('group_settings', group_id=2) }}">Family Dinner</a></li>
+  </ul>
+</body>
+</html>

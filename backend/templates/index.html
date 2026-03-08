@@ -1,25 +1,30 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Login Starter</title>
+    <title>ManeCourse — Login</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
   </head>
   <body>
-    <h1>Login</h1>
+    <h1 class="page-title">Login</h1>
+    <p>Demo: any username and password will work.</p>
 
     <form id="login-form">
-      <label for="username">Username</label>
-      <input id="username" name="username" type="text" required />
-
-      <label for="password">Password</label>
-      <input id="password" name="password" type="password" required />
-
-      <button type="submit">Login</button>
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input id="username" name="username" type="text" required />
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" required />
+      </div>
+      <button type="submit" class="btn">Login</button>
     </form>
 
     <p id="result"></p>
+    <p style="margin-top: 1rem;"><a href="{{ url_for('home') }}">Skip to app (demo)</a></p>
 
-    <script src="/static/app.js"></script>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
   </body>
 </html>

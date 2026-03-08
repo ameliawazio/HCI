@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ManeCourse — Restaurant</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+  {% set nav_current = 'Restaurant' %}
+  {% include '_nav.html' %}
+
+  <h1 class="page-title">Restaurant name (demo)</h1>
+
+  <section class="restaurant-detail">
+    <p class="detail-row"><span class="detail-label">Address:</span> 123 Main St, Gainesville</p>
+    <p class="detail-row"><span class="detail-label">Price:</span> $$</p>
+    <p class="detail-row"><span class="detail-label">Cuisine:</span> American</p>
+    <p class="detail-row"><span class="detail-label">Hours:</span> 11:00 – 22:00 (placeholder)</p>
+  </section>
+
+  <div class="actions">
+    <a href="{{ url_for('results', group_id=1) }}" class="btn">Back to results</a>
+    <a href="{{ url_for('map_page', group_id=1) }}" class="btn btn-secondary">Back to map</a>
+  </div>
+</body>
+</html>

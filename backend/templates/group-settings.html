@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ManeCourse — Group settings</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+  {% set nav_current = 'Group settings' %}
+  {% include '_nav.html' %}
+
+  <h1 class="page-title">Group settings</h1>
+  <p>Set radius, price range, and cuisine types for this group. Then start voting.</p>
+
+  <div class="form-group">
+    <label for="group-name">Group name</label>
+    <input id="group-name" type="text" value="Lunch Crew" />
+  </div>
+  <div class="form-group">
+    <label for="radius">Radius (miles)</label>
+    <input id="radius" type="number" value="5" min="1" max="25" />
+  </div>
+  <div class="form-group">
+    <label for="price">Price range</label>
+    <select id="price">
+      <option>$</option>
+      <option selected>$$</option>
+      <option>$$$</option>
+      <option>$$$$</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label>Cuisine types</label>
+    <p><small>Multi-select placeholder — Mediterranean, Southern, etc.</small></p>
+  </div>
+
+  <div class="actions">
+    <a href="{{ url_for('swipe', group_id=group_id) }}" class="btn">Start voting</a>
+    <a href="{{ url_for('home') }}" class="btn btn-secondary">Back to home</a>
+  </div>
+</body>
+</html>

@@ -1,0 +1,162 @@
+/* ManeCourse — shared layout and nav (demo) */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  margin: 0;
+  padding: 0;
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 1rem;
+  min-height: 100vh;
+}
+
+.app-nav {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #ddd;
+  margin-bottom: 1.5rem;
+}
+
+.app-nav a {
+  color: #333;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.app-nav a:hover {
+  text-decoration: underline;
+}
+
+.app-nav .nav-home {
+  font-weight: 600;
+}
+
+.app-nav .nav-current {
+  color: #666;
+  font-size: 0.95rem;
+}
+
+.page-title {
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.btn {
+  display: inline-block;
+  padding: 0.6rem 1.2rem;
+  background: #333;
+  color: #fff;
+  text-decoration: none;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: #555;
+}
+
+.btn-secondary {
+  background: #eee;
+  color: #333;
+}
+
+.card-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+}
+
+.card-list li {
+  padding: 0.75rem;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+}
+
+.card-list a {
+  color: #333;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.card-list a:hover {
+  text-decoration: underline;
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-weight: 500;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  max-width: 320px;
+  padding: 0.5rem;
+  font-size: 1rem;
+}
+
+.info-box {
+  background: #f5f5f5;
+  padding: 1rem;
+  border-radius: 8px;
+  margin: 1rem 0;
+}
+
+.map-placeholder {
+  background: #e8e8e8;
+  height: 280px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  margin: 1rem 0;
+}
+
+.swipe-area {
+  min-height: 360px;
+  background: #f9f9f9;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 1rem 0;
+  border: 2px dashed #ccc;
+}
+
+.swipe-actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.restaurant-detail .detail-row {
+  margin: 0.5rem 0;
+}
+
+.restaurant-detail .detail-label {
+  font-weight: 600;
+  color: #555;
+}

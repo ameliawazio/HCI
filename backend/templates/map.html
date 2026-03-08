@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ManeCourse — Map</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+  {% set nav_current = 'Map' %}
+  {% include '_nav.html' %}
+
+  <h1 class="page-title">Restaurants on map</h1>
+  <p>Nearby results with pins. Click a restaurant for details.</p>
+
+  <div class="map-placeholder">Map placeholder — markers for restaurants</div>
+
+  <h2>Nearby</h2>
+  <ul class="card-list">
+    <li><a href="{{ url_for('restaurant_detail', restaurant_id=1) }}">The Top</a></li>
+    <li><a href="{{ url_for('restaurant_detail', restaurant_id=2) }}">Satchel’s Pizza</a></li>
+    <li><a href="{{ url_for('restaurant_detail', restaurant_id=3) }}">Dragonfly</a></li>
+  </ul>
+
+  <div class="actions">
+    <a href="{{ url_for('results', group_id=group_id) }}" class="btn btn-secondary">Back to results</a>
+  </div>
+</body>
+</html>
