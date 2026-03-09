@@ -1,30 +1,103 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ManeCourse — Login</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
-  </head>
-  <body>
-    <h1 class="page-title">Login</h1>
-    <p>Demo: any username and password will work.</p>
-
-    <form id="login-form">
-      <div class="form-group">
-        <label for="username">Username</label>
-        <input id="username" name="username" type="text" required />
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ManeCourse - Login</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body class="login-page">
+  <div class="container">
+    <!-- Login Card -->
+    <div class="card">
+      <!-- Logo/Brand -->
+      <div class="brand">
+        <div class="logo">
+          <span class="logo-text">MC</span>
+        </div>
+        <h1>ManeCourse</h1>
+        <p class="subtitle">Sign in to your account</p>
+        <p>Demo: any email / password will work</p>
+        
       </div>
-      <div class="form-group">
-        <label for="password">Password</label>
-        <input id="password" name="password" type="password" required />
+
+      <!-- Login Form -->
+      <form class="form" id="loginForm">
+        <!-- Email Field -->
+        <div class="form-group">
+          <label for="email">Email Address</label>
+          <input 
+            type="email" 
+            id="email" 
+            name="email" 
+            placeholder="you@example.com" 
+            required
+          >
+        </div>
+
+        <!-- Password Field -->
+        <div class="form-group">
+          <div class="label-row">
+            <label for="password">Password</label>
+            <a href="#" class="forgot-link">Forgot password?</a>
+          </div>
+          <input 
+            type="password" 
+            id="password" 
+            name="password" 
+            placeholder="••••••••" 
+            required
+          >
+        </div>
+
+        <!-- Remember Me -->
+        <div class="checkbox-group">
+          <input type="checkbox" id="remember" name="remember">
+          <label for="remember" class="checkbox-label">Remember me</label>
+        </div>
+
+        <!-- Submit Button -->
+        <button type="submit" class="submit-btn">Sign In</button>
+      </form>
+
+      <!-- Divider -->
+      <div class="divider">
+        <div class="divider-line"></div>
+        <span class="divider-text">Or continue with</span>
       </div>
-      <button type="submit" class="btn">Login</button>
-    </form>
 
-    <p id="result"></p>
-    <p style="margin-top: 1rem;"><a href="{{ url_for('home') }}">Skip to app (demo)</a></p>
+      <!-- Sign Up Link -->
+      <div class="signup-link">
+        <p>
+          Don't have an account? 
+          <a href="#">Sign up</a>
+        </p>
+      </div>
+    </div>
 
-    <script src="{{ url_for('static', filename='app.js') }}"></script>
-  </body>
+    <!-- Footer -->
+    <div class="footer">
+      <p>&copy; 2026 ManeCourse. All rights reserved.</p>
+    </div>
+  </div>
+
+  <script>
+    // Handle form submission
+    document.getElementById('loginForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const remember = document.getElementById('remember').checked;
+      // Here you would typically send a request to your server
+      // For demo, redirect to home
+      window.location.href = "{{ url_for('home') }}";
+    });
+
+    // Handle social login
+    function handleSocialLogin(provider) {
+      console.log('Social login with:', provider);
+      alert('Social login with ' + provider + ' would be implemented here.');
+    }
+  </script>
+</body>
 </html>
