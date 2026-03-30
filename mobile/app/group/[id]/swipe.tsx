@@ -1,0 +1,211 @@
+import { Image } from 'expo-image';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { MapModal } from '../../../components/MapModal';
+import { useManeCourse } from '../../../context/ManeCourseContext';
+import { colors, radii, spacing } from '../../../constants/theme';
+
+export default function SwipeScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const {
+    session,
+    startSwipeSession,
+    recordSwipe,
+    getRestaurantsByIds,
+  } = useManeCourse();
+  const [index, setIndex] = useState(0);
+  const [mapOpen, setMapOpen] = useState(false);
+
+  useEffect(() => {
+    if (!id || id === 'new') return;
+    if (session.groupId !== id) {
+      startSwipeSession(id);
+    }
+  }, [id, session.groupId, startSwipeSession]);
+
+  useEffect(() => {
+    setIndex(0);
+  }, [session.deckIds.join(',')]);
+
+  const deck = getRestaurantsByIds(session.deckIds);
+  const current = deck[index];
+  const groupTitle =
+    id === '1'
+      ? 'The Roku Remotes'
+      : id === '2'
+        ? 'Family'
+        : 'Group';
+
+  const onChoice = (like: boolean) => {
+    if (!current) return;
+    recordSwipe(current.id, like);
+    if (index >= deck.length - 1) {
+      router.push(`/group/${id}/waiting`);
+    } else {
+      setIndex((i) => i + 1);
+    }
+  };
+
+  if (!current) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <Text style={styles.loading}>Loading deck…</Text>
+      </SafeAreaView>
+    );
+  }
+
+  const filled = Math.min(current.priceLevel, 3);
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <Text style={styles.headerTitle}>{groupTitle}</Text>
+
+      <View style={styles.card}>
+        <Image source={{ uri: current.imageUri }} style={styles.photo} />
+        <Text style={styles.restName}>{current.name}</Text>
+        <Text style={styles.cuisine}>{current.cuisine}</Text>
+        <Text style={styles.stars}>☆ ☆ ☆ ☆ ☆</Text>
+        <Pressable onPress={() => setMapOpen(true)}>
+          <Text style={styles.distance}>↗ {current.miles} miles away</Text>
+        </Pressable>
+        <View style={styles.priceRow}>
+          {[1, 2, 3].map((i) => (
+            <Text
+              key={i}
+              style={[
+                styles.dollar,
+                i <= filled ? styles.dollarOn : styles.dollarOff,
+              ]}
+            >
+              $
+            </Text>
+          ))}
+        </View>
+        <View style={styles.actions}>
+          <Pressable
+            style={[styles.circle, styles.no]}
+            onPress={() => onChoice(false)}
+          >
+            <Text style={styles.arrow}>←</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.circle, styles.yes]}
+            onPress={() => onChoice(true)}
+          >
+            <Text style={styles.arrow}>→</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      <View style={styles.tabBar}>
+        <Pressable
+          style={styles.tabItem}
+          onPress={() => router.replace('/home')}
+        >
+          <Text style={styles.tabIcon}>👥</Text>
+          <Text style={styles.tabLabel}>My Groups</Text>
+        </Pressable>
+        <Pressable
+          style={styles.tabItem}
+          onPress={() => router.push(`/group/${id}/settings`)}
+        >
+          <Text style={styles.tabIcon}>✎</Text>
+          <Text style={styles.tabLabel}>Group Settings</Text>
+        </Pressable>
+      </View>
+
+      <MapModal
+        visible={mapOpen}
+        onClose={() => setMapOpen(false)}
+        restaurantName={current.name}
+        miles={current.miles}
+        address="1680 W University Ave, Ste 20"
+      />
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.cream },
+  loading: { textAlign: 'center', marginTop: 40 },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    textAlign: 'center',
+    color: colors.brown,
+    fontFamily: 'Georgia',
+    marginBottom: spacing.md,
+  },
+  card: {
+    flex: 1,
+    marginHorizontal: spacing.md,
+    backgroundColor: colors.white,
+    borderRadius: radii.card,
+    padding: spacing.lg,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  photo: {
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    borderWidth: 3,
+    borderColor: colors.red,
+    marginBottom: spacing.md,
+  },
+  restName: {
+    fontSize: 26,
+    fontWeight: '800',
+    fontFamily: 'Georgia',
+    color: '#111',
+  },
+  cuisine: { fontSize: 15, color: '#333', marginTop: 4 },
+  stars: { fontSize: 18, marginVertical: 8, letterSpacing: 4 },
+  distance: {
+    color: colors.blueLink,
+    fontSize: 15,
+    textDecorationLine: 'underline',
+  },
+  priceRow: { flexDirection: 'row', gap: 4, marginTop: 12 },
+  dollar: { fontSize: 22, fontWeight: '800' },
+  dollarOn: { color: '#2E7D32' },
+  dollarOff: { color: '#111' },
+  actions: {
+    flexDirection: 'row',
+    gap: 40,
+    marginTop: 'auto',
+    paddingBottom: spacing.lg,
+  },
+  circle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  no: { backgroundColor: colors.redDislike },
+  yes: { backgroundColor: colors.greenLike },
+  arrow: { fontSize: 28, color: colors.white, fontWeight: '700' },
+  tabBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 12,
+    backgroundColor: '#EDE8E0',
+    borderTopWidth: 1,
+    borderTopColor: '#DDD',
+  },
+  tabItem: { alignItems: 'center' },
+  tabIcon: { fontSize: 22 },
+  tabLabel: { fontSize: 12, marginTop: 4, fontFamily: 'Georgia' },
+});

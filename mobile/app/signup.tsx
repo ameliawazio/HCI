@@ -1,0 +1,135 @@
+import { router } from 'expo-router';
+import { useState } from 'react';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { PrimaryButton } from '../components/PrimaryButton';
+import { colors, radii } from '../constants/theme';
+
+export default function SignUpScreen() {
+  const [user, setUser] = useState('');
+  const [pass, setPass] = useState('');
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.flex}
+      >
+        <View style={styles.top}>
+          <Pressable onPress={() => router.back()} hitSlop={12}>
+            <Text style={styles.back}>‹</Text>
+          </Pressable>
+          <Text style={styles.headerTitle}>Sign Up</Text>
+          <View style={{ width: 28 }} />
+        </View>
+        <View style={styles.stemRow}>
+          <View style={styles.stem} />
+          <View style={styles.leaf} />
+        </View>
+        <View style={styles.apple}>
+          <Text style={styles.label}>Username</Text>
+          <TextInput
+            value={user}
+            onChangeText={setUser}
+            style={styles.input}
+            placeholderTextColor="rgba(255,255,255,0.7)"
+            placeholder="Choose a username"
+            autoCapitalize="none"
+          />
+          <Text style={styles.label}>Password</Text>
+          <TextInput
+            value={pass}
+            onChangeText={setPass}
+            style={styles.input}
+            placeholderTextColor="rgba(255,255,255,0.7)"
+            placeholder="Choose a password"
+            secureTextEntry
+          />
+          <PrimaryButton
+            title="Sign up!"
+            onPress={() => router.replace('/home')}
+            style={styles.btn}
+          />
+          <Text style={styles.footer}>
+            Already have an account?{' '}
+            <Text
+              style={styles.footerBold}
+              onPress={() => router.replace('/login')}
+            >
+              Click Here
+            </Text>
+          </Text>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.cream },
+  flex: { flex: 1 },
+  top: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  back: { fontSize: 32, color: colors.brown, fontWeight: '600' },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: colors.brown,
+    fontFamily: 'Georgia',
+  },
+  stemRow: { alignItems: 'center', marginTop: 8 },
+  stem: {
+    width: 8,
+    height: 28,
+    backgroundColor: colors.brown,
+    borderRadius: 4,
+    transform: [{ rotate: '12deg' }],
+  },
+  leaf: {
+    position: 'absolute',
+    top: 12,
+    marginLeft: -40,
+    width: 28,
+    height: 18,
+    backgroundColor: colors.greenLeaf,
+    borderRadius: 10,
+  },
+  apple: {
+    flex: 1,
+    backgroundColor: colors.redApple,
+    marginTop: 16,
+    borderTopLeftRadius: radii.card * 2,
+    borderTopRightRadius: radii.card * 2,
+    padding: 24,
+    paddingTop: 40,
+  },
+  label: {
+    color: colors.white,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  input: {
+    borderWidth: 1.5,
+    borderColor: colors.white,
+    borderRadius: 8,
+    padding: 14,
+    color: colors.white,
+    marginBottom: 16,
+  },
+  btn: { marginTop: 8, marginBottom: 24 },
+  footer: { color: colors.white, textAlign: 'center', fontSize: 13 },
+  footerBold: { fontWeight: '800', textDecorationLine: 'underline' },
+});
