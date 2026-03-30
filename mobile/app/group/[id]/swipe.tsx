@@ -88,6 +88,12 @@ export default function SwipeScreen() {
             </Text>
           ))}
         </View>
+        <Pressable
+          style={styles.moreDetailsBtn}
+          onPress={() => router.push({ pathname: '/RestaurantDetails', params: { restaurantId: current.id } })}
+        >
+          <Text style={styles.moreDetailsText}>More Details <Text style={{ fontWeight: 'bold' }}>+</Text></Text>
+        </Pressable>
         <View style={styles.actions}>
           <Pressable
             style={[styles.circle, styles.no]}
@@ -133,6 +139,21 @@ export default function SwipeScreen() {
 }
 
 const styles = StyleSheet.create({
+    moreDetailsBtn: {
+      marginTop: 10,
+      paddingVertical: 6,
+      paddingHorizontal: 18,
+      backgroundColor: '#f3f3f3',
+      borderRadius: 18,
+      alignSelf: 'center',
+      borderWidth: 1,
+      borderColor: '#ddd',
+    },
+    moreDetailsText: {
+      fontSize: 16,
+      color: '#333',
+      textAlign: 'center',
+    },
   safe: { flex: 1, backgroundColor: colors.cream },
   loading: { textAlign: 'center', marginTop: 40 },
   headerTitle: {
