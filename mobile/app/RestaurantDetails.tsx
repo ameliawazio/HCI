@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet, Linking, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { RouteProp, useRoute } from '@react-navigation/native';
+import { router } from 'expo-router';
+import { useRoute } from '@react-navigation/native';
 import { useManeCourse } from '../context/ManeCourseContext';
 
 // Props: expects a restaurantId passed via navigation params
@@ -16,6 +17,11 @@ export default function RestaurantDetails() {
   if (!restaurant) {
     return (
       <SafeAreaView style={styles.safe}>
+        <View style={styles.topRow}>
+          <Pressable onPress={() => router.back()} hitSlop={12}>
+            <Text style={styles.back}>‹</Text>
+          </Pressable>
+        </View>
         <Text style={styles.notFound}>Restaurant not found.</Text>
       </SafeAreaView>
     );
@@ -23,6 +29,11 @@ export default function RestaurantDetails() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <View style={styles.topRow}>
+        <Pressable onPress={() => router.back()} hitSlop={12}>
+          <Text style={styles.back}>‹</Text>
+        </Pressable>
+      </View>
       <View style={styles.container}>
         <Text style={styles.name}>{restaurant.name}</Text>
         {restaurant.menuImageUri && (
@@ -53,6 +64,12 @@ export default function RestaurantDetails() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#fff' },
+  topRow: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    alignItems: 'flex-start',
+  },
+  back: { fontSize: 32, color: '#2a3eb1', fontWeight: '600' },
   container: { alignItems: 'center', padding: 24 },
   photo: { width: 220, height: 220, borderRadius: 110, marginBottom: 18 },
   name: { fontSize: 28, fontWeight: 'bold', marginBottom: 18, textAlign: 'center' },

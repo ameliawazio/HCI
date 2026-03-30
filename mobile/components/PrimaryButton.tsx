@@ -59,6 +59,11 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.88,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
   },
   text: {
     fontSize: 18,
