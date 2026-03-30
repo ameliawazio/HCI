@@ -2,26 +2,44 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useEffect, useState } from 'react';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { colors, spacing } from '../constants/theme';
 
+const IMAGES = [
+  require('../assets/images/restaurantIcon.png'),
+  require('../assets/images/gpsPointerIcon.png'),
+];
+
 export default function LandingScreen() {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prevIndex) => (prevIndex + 1) % IMAGES.length);
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.blob} />
       <View style={styles.content}>
         <Image
-          source={{
-            uri: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400',
-          }}
+          source={IMAGES[currentImageIndex]}
           style={styles.hero}
           contentFit="contain"
         />
         <View style={styles.dots}>
-          <View style={[styles.dot, styles.dotActive]} />
-          <View style={styles.dot} />
+          {IMAGES.map((_, index) => (
+            <View
+              key={index}
+              style={[styles.dot, index === currentImageIndex && styles.dotActive]}
+            />
+          ))}
         </View>
-        <Text style={styles.title}>Hay there!</Text>
+        <Text style={styles.title}>ManeCourse</Text>
         <Text style={styles.sub}>Skip the fight and get to the food!</Text>
         <View style={styles.buttons}>
           <PrimaryButton
@@ -77,18 +95,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.brown,
   },
   title: {
-    fontSize: 34,
+    fontSize: 45,
     fontWeight: '800',
     color: colors.brown,
-    marginBottom: 8,
-    fontFamily: 'Georgia',
+    marginTop: 200,
+    marginBottom: 15,
+    fontFamily: 'ArialRoundedMTBold',
   },
   sub: {
-    fontSize: 17,
+    fontSize: 20,
     color: colors.brownDark,
     textAlign: 'center',
     marginBottom: spacing.xl,
-    fontFamily: 'Georgia',
+    fontFamily: 'ArialRoundedMTBold',
   },
   buttons: {
     width: '100%',
