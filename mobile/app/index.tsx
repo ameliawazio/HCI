@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEffect, useState } from 'react';
@@ -11,7 +11,14 @@ const IMAGES = [
   require('../assets/images/gpsPointerIcon.png'),
 ];
 
+let hasRedirectedToLanding = false;
+
 export default function LandingScreen() {
+  if (!hasRedirectedToLanding) {
+    hasRedirectedToLanding = true;
+    return <Redirect href="/landing" />;
+  }
+
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   useEffect(() => {
