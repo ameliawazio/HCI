@@ -112,9 +112,16 @@ export type SessionState = {
   winnerId: string | null;
 };
 
+export type UserProfile = {
+  username: string;
+  fullName: string;
+  email: string;
+};
+
 type ManeCourseContextValue = {
   groups: Group[];
-  currentUser: { username: string; fullName: string; email: string };
+  currentUser: UserProfile;
+  updateCurrentUser: (updates: Partial<UserProfile>) => void;
   groupMembersByGroupId: Record<string, string[]>;
   getRestaurantsByIds: (ids: string[]) => Restaurant[];
   /** restaurants shown = members × factor (demo) */
@@ -217,6 +224,11 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
     {},
   );
   const [session, setSession] = useState<SessionState>(defaultSession);
+  const [currentUser, setCurrentUser] = useState<UserProfile>({
+    username: 'Jdoe121',
+    fullName: 'John Doe',
+    email: 'Jdoe121@gmail.com',
+  });
 
   const groups = useMemo(() => MOCK_GROUPS, []);
 
@@ -289,13 +301,17 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
     }));
   }, []);
 
+  const updateCurrentUser = useCallback((updates: Partial<UserProfile>) => {
+    setCurrentUser((prev) => ({
+      ...prev,
+      ...updates,
+    }));
+  }, []);
+
   const value: ManeCourseContextValue = {
     groups,
-    currentUser: {
-      username: 'Jdoe121',
-      fullName: 'John Doe',
-      email: 'Jdoe121@gmail.com',
-    },
+    currentUser,
+    updateCurrentUser,
     groupMembersByGroupId,
     getRestaurantsByIds,
     restaurantsPerMemberFactor,
