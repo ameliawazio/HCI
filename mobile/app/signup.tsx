@@ -4,6 +4,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -11,9 +12,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PrimaryButton } from '../components/PrimaryButton';
-import { colors, radii } from '../constants/theme';
+import { colors, radii, spacing } from '../constants/theme';
 
 export default function SignUpScreen() {
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
   const [user, setUser] = useState('');
   const [pass, setPass] = useState('');
 
@@ -27,47 +30,86 @@ export default function SignUpScreen() {
           <Pressable onPress={() => router.back()} hitSlop={12}>
             <Text style={styles.back}>‹</Text>
           </Pressable>
-          <Text style={styles.headerTitle}>Sign Up</Text>
+          <Text style={styles.headerTitle}>Create Account</Text>
           <View style={{ width: 28 }} />
         </View>
-        <View style={styles.stemRow}>
-          <View style={styles.stem} />
-          <View style={styles.leaf} />
-        </View>
-        <View style={styles.apple}>
-          <Text style={styles.label}>Username</Text>
-          <TextInput
-            value={user}
-            onChangeText={setUser}
-            style={styles.input}
-            placeholderTextColor="rgba(255,255,255,0.7)"
-            placeholder="Choose a username"
-            autoCapitalize="none"
-          />
-          <Text style={styles.label}>Password</Text>
-          <TextInput
-            value={pass}
-            onChangeText={setPass}
-            style={styles.input}
-            placeholderTextColor="rgba(255,255,255,0.7)"
-            placeholder="Choose a password"
-            secureTextEntry
-          />
-          <PrimaryButton
-            title="Sign up!"
-            onPress={() => router.replace('/home')}
-            style={styles.btn}
-          />
-          <Text style={styles.footer}>
-            Already have an account?{' '}
-            <Text
-              style={styles.footerBold}
-              onPress={() => router.replace('/login')}
-            >
-              Click Here
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          <View style={styles.hero}>
+            <Text style={styles.heroEyebrow}>ManeCourse</Text>
+            <Text style={styles.heroTitle}>Join The Stable</Text>
+            <Text style={styles.heroSub}>
+              Set up your profile and start matching your group with great food.
             </Text>
-          </Text>
-        </View>
+          </View>
+
+          <View style={styles.formCard}>
+            <View style={styles.formFields}>
+              <Text style={styles.label}>Full Name</Text>
+              <TextInput
+                value={fullName}
+                onChangeText={setFullName}
+                style={styles.input}
+                placeholder="Enter your full name"
+                placeholderTextColor={colors.greyText}
+                autoCapitalize="words"
+              />
+
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                style={styles.input}
+                placeholder="Enter your email"
+                placeholderTextColor={colors.greyText}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+
+              <Text style={styles.label}>Username</Text>
+              <TextInput
+                value={user}
+                onChangeText={setUser}
+                style={styles.input}
+                placeholder="Choose a username"
+                placeholderTextColor={colors.greyText}
+                autoCapitalize="none"
+              />
+
+              <Text style={styles.label}>Password</Text>
+              <TextInput
+                value={pass}
+                onChangeText={setPass}
+                style={styles.input}
+                placeholder="Create a password"
+                placeholderTextColor={colors.greyText}
+                secureTextEntry
+              />
+            </View>
+
+            <View style={styles.formBottom}>
+              <PrimaryButton
+                title="Create Account"
+                onPress={() => router.replace('/home')}
+                style={styles.btn}
+              />
+
+              <Text style={styles.footer}>
+                Already have an account?{' '}
+                <Text
+                  style={styles.footerBold}
+                  onPress={() => router.replace('/login')}
+                >
+                  Login
+                </Text>
+              </Text>
+            </View>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -80,8 +122,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
   },
   back: { fontSize: 32, color: colors.brown, fontWeight: '600' },
   headerTitle: {
@@ -90,46 +133,85 @@ const styles = StyleSheet.create({
     color: colors.brown,
     fontFamily: 'Georgia',
   },
-  stemRow: { alignItems: 'center', marginTop: 8 },
-  stem: {
-    width: 8,
-    height: 28,
-    backgroundColor: colors.brown,
-    borderRadius: 4,
-    transform: [{ rotate: '12deg' }],
+  scroll: {
+    flexGrow: 1,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: 0,
+    gap: spacing.md,
   },
-  leaf: {
-    position: 'absolute',
-    top: 12,
-    marginLeft: -40,
-    width: 28,
-    height: 18,
-    backgroundColor: colors.greenLeaf,
-    borderRadius: 10,
+  hero: {
+    backgroundColor: colors.brownDark,
+    borderRadius: radii.card,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    marginTop: spacing.sm,
   },
-  apple: {
-    flex: 1,
-    backgroundColor: colors.redApple,
-    marginTop: 16,
-    borderTopLeftRadius: radii.card * 2,
-    borderTopRightRadius: radii.card * 2,
-    padding: 24,
-    paddingTop: 40,
-  },
-  label: {
-    color: colors.white,
-    fontWeight: '600',
+  heroEyebrow: {
+    color: colors.creamAlt,
+    fontSize: 12,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
     marginBottom: 6,
   },
-  input: {
-    borderWidth: 1.5,
-    borderColor: colors.white,
-    borderRadius: 8,
-    padding: 14,
+  heroTitle: {
     color: colors.white,
-    marginBottom: 16,
+    fontSize: 28,
+    fontWeight: '800',
+    fontFamily: 'Georgia',
+    marginBottom: 6,
   },
-  btn: { marginTop: 8, marginBottom: 24 },
-  footer: { color: colors.white, textAlign: 'center', fontSize: 13 },
-  footerBold: { fontWeight: '800', textDecorationLine: 'underline' },
+  heroSub: {
+    color: colors.creamAlt,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  formCard: {
+    flex: 1,
+    backgroundColor: colors.tanBlob,
+    borderRadius: radii.card,
+    padding: spacing.lg,
+    paddingBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: '#E7CCAC',
+    marginBottom: spacing.sm,
+    justifyContent: 'flex-start',
+  },
+  formFields: {
+    gap: 2,
+  },
+  formBottom: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingTop: spacing.sm,
+  },
+  label: {
+    color: colors.brownDark,
+    fontWeight: '700',
+    marginBottom: 6,
+    marginTop: 6,
+  },
+  input: {
+    backgroundColor: colors.white,
+    borderRadius: 10,
+    padding: 14,
+    color: colors.brownDark,
+    borderWidth: 1,
+    borderColor: '#E7DED1',
+  },
+  btn: {
+    marginTop: 0,
+    marginBottom: 6,
+    backgroundColor: colors.brownDark,
+  },
+  footer: {
+    color: colors.brownDark,
+    textAlign: 'center',
+    fontSize: 13,
+    marginTop: 0,
+  },
+  footerBold: {
+    fontWeight: '800',
+    textDecorationLine: 'underline',
+    color: colors.brown,
+  },
 });
