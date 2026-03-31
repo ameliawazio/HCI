@@ -23,17 +23,47 @@ const CUISINES = [
 
 export default function GroupSettingsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { addMemberToGroup, groupMembersByGroupId } = useManeCourse();
+  const { addMemberToGroup, groupMembersByGroupId, createGroup } = useManeCourse();
   const gid = id === 'new' ? 'new' : (id ?? '1');
   const [groupName, setGroupName] = useState(
     id === 'new' ? 'New group' : 'The Roku Remotes',
   );
   const [addUser, setAddUser] = useState('');
   const [radius, setRadius] = useState(0.3);
+  const [priceRange, setPriceRange] = useState(2);
+  const [selectedCuisines, setSelectedCuisines] = useState<Set<string>>(
+    new Set(),
+  );
+  const [newMembers, setNewMembers] = useState<string[]>([]);
 
   const members =
     groupMembersByGroupId[gid] ||
     MEMBER_USERNAMES.slice(0, 4);
+
+  const handleToggleCuisine = (cuisine: string) => {
+    setSelectedCuisines((prev) => {
+      const updated = new Set(prev);
+      if (updated.has(cuisine)) {
+        updated.delete(cuisine);
+      } else {
+        updated.add(cuisine);
+      }
+      return updated;
+    });
+  };
+
+  const handleCreateGroup = () => {
+    if (!groupName.trim()) {
+      alert('Please enter a group name');
+      return;
+    }
+    const allMembers = [...members, ...newMembers];
+    createGroup({
+      name: groupName,
+      members: allMembers,
+    });
+    router.back();
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -62,7 +92,27 @@ export default function GroupSettingsScreen() {
         />
 
         <Text style={styles.label}>Price Range</Text>
-        <Text style={styles.dollars}>$ $ $</Text>
+        <View style={styles.priceRow}>
+          {[1, 2, 3, 4].map((level) => (
+            <Pressable
+              key={level}
+              onPress={() => setPriceRange(level)}
+              style={[
+                styles.priceButton,
+                priceRange >= level && styles.priceButtonActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.priceButtonText,
+                  priceRange >= level && styles.priceButtonTextActive,
+                ]}
+              >
+                $
+              </Text>
+            </Pressable>
+          ))}
+        </View>
 
         <Text style={styles.label}>Radius</Text>
         <View style={styles.sliderRow}>
@@ -82,11 +132,18 @@ export default function GroupSettingsScreen() {
         <Text style={styles.label}>Cuisine Types</Text>
         <View style={styles.chips}>
           {CUISINES.map((c) => (
-            <View key={c} style={styles.chip}>
-              <Text>
-                {c} <Text style={styles.plus}>+</Text>
+            <Pressable
+              key={c}
+              onPress={() => handleToggleCuisine(c)}
+              style={[
+                styles.chip,
+                selectedCuisines.has(c) && styles.chipActive,
+              ]}
+            >
+              <Text style={selectedCuisines.has(c) ? styles.chipTextActive : {}}>
+                {c}
               </Text>
-            </View>
+            </Pressable>
           ))}
         </View>
 
@@ -102,6 +159,13 @@ export default function GroupSettingsScreen() {
               </Text>
             </View>
           ))}
+          {newMembers.map((m) => (
+            <View key={m} style={styles.chip}>
+              <Text>
+                {m} <Text style={styles.minus}>−</Text>
+              </Text>
+            </View>
+          ))}
         </View>
         <TextInput
           style={styles.input}
@@ -111,11 +175,17 @@ export default function GroupSettingsScreen() {
           onChangeText={setAddUser}
           onSubmitEditing={() => {
             if (addUser.trim()) {
-              addMemberToGroup(gid, addUser.trim());
+              setNewMembers([...newMembers, addUser.trim()]);
               setAddUser('');
             }
           }}
         />
+
+        {id === 'new' && (
+          <Pressable style={styles.createButton} onPress={handleCreateGroup}>
+            <Text style={styles.createButtonText}>Create Group</Text>
+          </Pressable>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -152,6 +222,23 @@ const styles = StyleSheet.create({
     borderColor: '#EEE',
   },
   dollars: { fontSize: 28, fontWeight: '800', letterSpacing: 4 },
+  priceRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  priceButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#DDD',
+    borderRadius: radii.chip,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+  },
+  priceButtonActive: {
+    backgroundColor: colors.brown,
+    borderColor: colors.brown,
+  },
+  priceButtonText: { fontSize: 16, fontWeight: '600', color: '#666' },
+  priceButtonTextActive: { color: colors.cream },
   sliderRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
   track: {
     height: 8,
@@ -177,7 +264,24 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: radii.chip,
   },
+  chipActive: {
+    backgroundColor: colors.brown,
+  },
+  chipTextActive: { color: '#FFF', fontWeight: '600' },
   plus: { fontWeight: '800' },
   minus: { fontWeight: '800', color: '#C00' },
   hint: { fontSize: 12, color: colors.greyText, marginBottom: 8 },
+  createButton: {
+    marginTop: spacing.lg,
+    marginBottom: spacing.lg,
+    backgroundColor: colors.brown,
+    paddingVertical: spacing.md,
+    borderRadius: radii.card,
+    alignItems: 'center',
+  },
+  createButtonText: {
+    color: colors.cream,
+    fontWeight: '700',
+    fontSize: 16,
+  },
 });

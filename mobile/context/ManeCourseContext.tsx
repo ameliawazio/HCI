@@ -136,6 +136,7 @@ type ManeCourseContextValue = {
   resolveAfterWaiting: () => SessionState;
   resetSession: () => void;
   addMemberToGroup: (groupId: string, username: string) => void;
+  createGroup: (data: { name: string; members: string[] }) => Group;
 };
 
 const defaultSession: SessionState = {
@@ -220,6 +221,7 @@ function computeSessionAfterWaiting(prev: SessionState): SessionState {
 }
 
 export function ManeCourseProvider({ children }: { children: React.ReactNode }) {
+  const [groupsList, setGroupsList] = useState<Group[]>(MOCK_GROUPS);
   const [extraMembers, setExtraMembers] = useState<Record<string, string[]>>(
     {},
   );
@@ -230,7 +232,7 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
     email: 'Jdoe121@gmail.com',
   });
 
-  const groups = useMemo(() => MOCK_GROUPS, []);
+  const groups = useMemo(() => groupsList, [groupsList]);
 
   const groupMembersByGroupId = useMemo(() => {
     const base: Record<string, string[]> = {
@@ -308,6 +310,25 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
     }));
   }, []);
 
+  const createGroup = useCallback((data: { name: string; members: string[] }) => {
+    const newId = `${Date.now()}`;
+    const newGroup: Group = {
+      id: newId,
+      name: data.name,
+      memberCount: data.members.length,
+      imageKey: 'roku', // default image
+    };
+    setGroupsList((prev) => [...prev, newGroup]);
+    // Add members to the group
+    if (data.members.length > 0) {
+      setExtraMembers((m) => ({
+        ...m,
+        [newId]: data.members,
+      }));
+    }
+    return newGroup;
+  }, []);
+
   const value: ManeCourseContextValue = {
     groups,
     currentUser,
@@ -322,6 +343,7 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
     resolveAfterWaiting,
     resetSession,
     addMemberToGroup,
+    createGroup,
   };
 
   return (
