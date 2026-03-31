@@ -31,13 +31,18 @@ export default function LandingScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.blob} />
+      <View style={styles.blobContainer}>
+        <View style={styles.blob} />
+        <View style={styles.blobSecondary} />
+      </View>
       <View style={styles.content}>
-        <Image
-          source={IMAGES[currentImageIndex]}
-          style={styles.hero}
-          contentFit="contain"
-        />
+        <View style={styles.heroContainer}>
+          <Image
+            source={IMAGES[currentImageIndex]}
+            style={styles.hero}
+            contentFit="contain"
+          />
+        </View>
         <View style={styles.dots}>
           {IMAGES.map((_, index) => (
             <View
@@ -46,8 +51,10 @@ export default function LandingScreen() {
             />
           ))}
         </View>
-        <Text style={styles.title}>ManeCourse</Text>
-        <Text style={styles.sub}>Skip the fight and get to the food!</Text>
+        <View style={styles.titleSection}>
+          <Text style={styles.title}>ManeCourse</Text>
+          <Text style={styles.sub}>Skip the fight and get to the food!</Text>
+        </View>
         <View style={styles.buttons}>
           <PrimaryButton
             title="Login"
@@ -69,57 +76,91 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.cream,
   },
-  blob: {
+  blobContainer: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: colors.tanBlob,
-    opacity: 0.85,
-    transform: [{ scale: 1.4 }, { translateY: 80 }],
-    borderRadius: 200,
+    overflow: 'hidden',
+  },
+  blob: {
+    width: 300,
+    height: 300,
+    backgroundColor: colors.brown,
+    opacity: 0.15,
+    borderRadius: 160,
+    position: 'absolute',
+    top: 50,
+    left: '50%',
+    marginLeft: -150,
+  },
+  blobSecondary: {
+    width: 150,
+    height: 150,
+    backgroundColor: colors.creamAlt,
+    opacity: 0.6,
+    borderRadius: 75,
+    position: 'absolute',
+    bottom: 20,
+    left: -40,
   },
   content: {
     flex: 1,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xl,
+    justifyContent: 'space-between',
     alignItems: 'center',
+    zIndex: 1,
+  },
+  heroContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: spacing.lg,
   },
   hero: {
-    width: 220,
-    height: 180,
+    width: 240,
+    height: 200,
     marginBottom: spacing.md,
   },
   dots: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: spacing.lg,
+    gap: 10,
+    marginVertical: spacing.lg,
+    justifyContent: 'center',
   },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#CCC',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: 'rgba(75, 54, 33, 0.2)',
+    transition: 'all 0.3s ease',
   },
   dotActive: {
     backgroundColor: colors.brown,
+    width: 28,
+    borderRadius: 5,
+  },
+  titleSection: {
+    alignItems: 'center',
+    marginBottom: spacing.lg,
   },
   title: {
-    fontSize: 45,
-    fontWeight: '800',
+    fontSize: 48,
+    fontWeight: '900',
     color: colors.brown,
-    marginTop: 200,
-    marginBottom: 15,
+    marginBottom: spacing.md,
     fontFamily: 'ArialRoundedMTBold',
+    letterSpacing: 0.5,
   },
   sub: {
-    fontSize: 20,
-    color: colors.brownDark,
+    fontSize: 18,
+    color: colors.brown,
     textAlign: 'center',
-    marginBottom: spacing.xl,
     fontFamily: 'ArialRoundedMTBold',
+    lineHeight: 26,
+    paddingHorizontal: spacing.md,
   },
   buttons: {
     width: '100%',
     gap: spacing.md,
-    marginTop: 'auto',
-    marginBottom: spacing.xl,
+    paddingHorizontal: spacing.sm,
   },
 });
