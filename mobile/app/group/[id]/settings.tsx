@@ -23,10 +23,11 @@ const CUISINES = [
 
 export default function GroupSettingsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { addMemberToGroup, groupMembersByGroupId, createGroup } = useManeCourse();
-  const gid = id === 'new' ? 'new' : (id ?? '1');
+  const { groupMembersByGroupId, createGroup } = useManeCourse();
+  const normalizedId = Array.isArray(id) ? id[0] : id;
+  const gid = normalizedId === 'new' ? 'new' : (normalizedId ?? '1');
   const [groupName, setGroupName] = useState(
-    id === 'new' ? 'New group' : 'The Roku Remotes',
+    normalizedId === 'new' ? 'New group' : 'The Roku Remotes',
   );
   const [addUser, setAddUser] = useState('');
   const [radius, setRadius] = useState(0.3);
@@ -58,11 +59,11 @@ export default function GroupSettingsScreen() {
       return;
     }
     const allMembers = [...members, ...newMembers];
-    createGroup({
+    const newGroup = createGroup({
       name: groupName,
       members: allMembers,
     });
-    router.back();
+    router.replace(`/group/${newGroup.id}/swipe`);
   };
 
   return (
@@ -181,7 +182,7 @@ export default function GroupSettingsScreen() {
           }}
         />
 
-        {id === 'new' && (
+        {normalizedId === 'new' && (
           <Pressable style={styles.createButton} onPress={handleCreateGroup}>
             <Text style={styles.createButtonText}>Create Group</Text>
           </Pressable>

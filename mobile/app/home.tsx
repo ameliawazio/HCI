@@ -1,12 +1,27 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useManeCourse } from '../context/ManeCourseContext';
 import { colors, radii, spacing } from '../constants/theme';
 
 export default function HomeScreen() {
-  const { groups } = useManeCourse();
+  const { groups, deleteGroup } = useManeCourse();
+
+  const handleDeleteGroup = (groupId: string, groupName: string) => {
+    Alert.alert(
+      'Delete group?',
+      `Remove ${groupName}? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => deleteGroup(groupId),
+        },
+      ],
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -23,28 +38,35 @@ export default function HomeScreen() {
 
       <View style={styles.list}>
         {groups.map((g) => (
-          <Pressable
-            key={g.id}
-            style={styles.card}
-            onPress={() => {
-              router.push(`/group/${g.id}/swipe`);
-            }}
-          >
-            <Image
-              source={{
-                uri:
-                  g.imageKey === 'roku'
-                    ? 'https://images.unsplash.com/photo-1593789196529-4a366615a65e?w=200'
-                    : 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=200',
+          <View key={g.id} style={styles.card}>
+            <Pressable
+              style={styles.cardMain}
+              onPress={() => {
+                router.push(`/group/${g.id}/swipe`);
               }}
-              style={styles.avatar}
-              contentFit="cover"
-            />
-            <View style={styles.cardText}>
-              <Text style={styles.cardTitle}>{g.name}</Text>
-              <Text style={styles.cardSub}>{g.memberCount} members</Text>
-            </View>
-          </Pressable>
+            >
+              <Image
+                source={{
+                  uri:
+                    g.imageKey === 'roku'
+                      ? 'https://images.unsplash.com/photo-1593789196529-4a366615a65e?w=200'
+                      : 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=200',
+                }}
+                style={styles.avatar}
+                contentFit="cover"
+              />
+              <View style={styles.cardText}>
+                <Text style={styles.cardTitle}>{g.name}</Text>
+                <Text style={styles.cardSub}>{g.memberCount} members</Text>
+              </View>
+            </Pressable>
+            <Pressable
+              style={styles.deleteHitArea}
+              onPress={() => handleDeleteGroup(g.id, g.name)}
+            >
+              <View style={styles.deleteLine} />
+            </Pressable>
+          </View>
         ))}
       </View>
 
@@ -99,6 +121,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 6,
     elevation: 4,
+  },
+  cardMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  deleteHitArea: {
+    width: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteLine: {
+    width: 14,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: '#D84343',
   },
   avatar: {
     width: 56,

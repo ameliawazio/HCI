@@ -14,7 +14,9 @@ import { colors, radii, spacing } from '../../../constants/theme';
 
 export default function SwipeScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const normalizedId = Array.isArray(id) ? id[0] : id;
   const {
+    groups,
     session,
     startSwipeSession,
     recordSwipe,
@@ -24,11 +26,11 @@ export default function SwipeScreen() {
   const [mapOpen, setMapOpen] = useState(false);
 
   useEffect(() => {
-    if (!id || id === 'new') return;
-    if (session.groupId !== id) {
-      startSwipeSession(id);
+    if (!normalizedId || normalizedId === 'new') return;
+    if (session.groupId !== normalizedId) {
+      startSwipeSession(normalizedId);
     }
-  }, [id, session.groupId, startSwipeSession]);
+  }, [normalizedId, session.groupId, startSwipeSession]);
 
   useEffect(() => {
     setIndex(0);
@@ -37,17 +39,13 @@ export default function SwipeScreen() {
   const deck = getRestaurantsByIds(session.deckIds);
   const current = deck[index];
   const groupTitle =
-    id === '1'
-      ? 'The Roku Remotes'
-      : id === '2'
-        ? 'Family'
-        : 'Group';
+    groups.find((g) => g.id === normalizedId)?.name ?? 'Group';
 
   const onChoice = (like: boolean) => {
     if (!current) return;
     recordSwipe(current.id, like);
     if (index >= deck.length - 1) {
-      router.push(`/group/${id}/waiting`);
+      router.push(`/group/${normalizedId}/waiting`);
     } else {
       setIndex((i) => i + 1);
     }
@@ -120,7 +118,7 @@ export default function SwipeScreen() {
         </Pressable>
         <Pressable
           style={styles.tabItem}
-          onPress={() => router.push(`/group/${id}/settings`)}
+          onPress={() => router.push(`/group/${normalizedId}/settings`)}
         >
           <Text style={styles.tabIcon}>✎</Text>
           <Text style={styles.tabLabel}>Group Settings</Text>

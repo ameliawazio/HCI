@@ -137,6 +137,7 @@ type ManeCourseContextValue = {
   resetSession: () => void;
   addMemberToGroup: (groupId: string, username: string) => void;
   createGroup: (data: { name: string; members: string[] }) => Group;
+  deleteGroup: (groupId: string) => void;
 };
 
 const defaultSession: SessionState = {
@@ -151,8 +152,8 @@ const defaultSession: SessionState = {
 
 const ManeCourseContext = createContext<ManeCourseContextValue | null>(null);
 
-function buildDeckForGroup(groupId: string, factor: number): string[] {
-  const g = MOCK_GROUPS.find((x) => x.id === groupId);
+function buildDeckForGroup(groupId: string, factor: number, groups: Group[]): string[] {
+  const g = groups.find((x) => x.id === groupId);
   const n = g ? Math.max(1, g.memberCount * factor) : 5;
   const out: string[] = [];
   for (let i = 0; i < n; i++) {
@@ -255,14 +256,14 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
   const restaurantsPerMemberFactor = 3;
 
   const startSwipeSession = useCallback((groupId: string) => {
-    const deckIds = buildDeckForGroup(groupId, restaurantsPerMemberFactor);
+    const deckIds = buildDeckForGroup(groupId, restaurantsPerMemberFactor, groupsList);
     setSession({
       ...defaultSession,
       groupId,
       deckIds,
       round: 1,
     });
-  }, [restaurantsPerMemberFactor]);
+  }, [groupsList, restaurantsPerMemberFactor]);
 
   const recordSwipe = useCallback((restaurantId: string, like: boolean) => {
     setSession((prev) => {
@@ -329,6 +330,16 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
     return newGroup;
   }, []);
 
+  const deleteGroup = useCallback((groupId: string) => {
+    setGroupsList((prev) => prev.filter((g) => g.id !== groupId));
+    setExtraMembers((prev) => {
+      const next = { ...prev };
+      delete next[groupId];
+      return next;
+    });
+    setSession((prev) => (prev.groupId === groupId ? defaultSession : prev));
+  }, []);
+
   const value: ManeCourseContextValue = {
     groups,
     currentUser,
@@ -344,6 +355,7 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
     resetSession,
     addMemberToGroup,
     createGroup,
+    deleteGroup,
   };
 
   return (
