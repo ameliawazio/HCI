@@ -30,7 +30,7 @@ export default function LoginScreen() {
       router.replace('/home');
       return;
     }
-    setError('Invalid login. Use gator1-gator5 and password');
+    setError('Invalid login.');
   }
 
   return (
