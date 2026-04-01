@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import {
   Pressable,
   StyleSheet,
@@ -25,12 +26,14 @@ export default function SwipeScreen() {
   const [index, setIndex] = useState(0);
   const [mapOpen, setMapOpen] = useState(false);
 
-  useEffect(() => {
-    if (!normalizedId || normalizedId === 'new') return;
-    if (session.groupId !== normalizedId) {
+  // Restart the session every time this screen is focused so that
+  // any group setting changes (price, radius, cuisines) are applied.
+  useFocusEffect(
+    useCallback(() => {
+      if (!normalizedId || normalizedId === 'new') return;
       startSwipeSession(normalizedId);
-    }
-  }, [normalizedId, session.groupId, startSwipeSession]);
+    }, [normalizedId, startSwipeSession]),
+  );
 
   useEffect(() => {
     setIndex(0);
@@ -52,9 +55,23 @@ export default function SwipeScreen() {
   };
 
   if (!current) {
+    const sessionReady = session.groupId === normalizedId;
     return (
       <SafeAreaView style={styles.safe}>
-        <Text style={styles.loading}>Loading deck…</Text>
+        <Text style={styles.headerTitle}>{groupTitle}</Text>
+        <Text style={styles.loading}>
+          {sessionReady
+            ? 'No restaurants match your filters.\nTry adjusting settings.'
+            : 'Loading deck…'}
+        </Text>
+        {sessionReady && (
+          <Pressable
+            style={styles.settingsLink}
+            onPress={() => router.push(`/group/${normalizedId}/settings`)}
+          >
+            <Text style={styles.settingsLinkText}>Edit Group Settings</Text>
+          </Pressable>
+        )}
       </SafeAreaView>
     );
   }
@@ -153,7 +170,9 @@ const styles = StyleSheet.create({
       textAlign: 'center',
     },
   safe: { flex: 1, backgroundColor: colors.cream },
-  loading: { textAlign: 'center', marginTop: 40 },
+  loading: { textAlign: 'center', marginTop: 80, fontSize: 16, color: '#555', paddingHorizontal: 32, lineHeight: 24 },
+  settingsLink: { alignSelf: 'center', marginTop: 20, paddingVertical: 10, paddingHorizontal: 24, backgroundColor: colors.brown, borderRadius: 20 },
+  settingsLinkText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   headerTitle: {
     fontSize: 20,
     fontWeight: '800',

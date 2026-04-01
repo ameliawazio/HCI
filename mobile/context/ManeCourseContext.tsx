@@ -16,6 +16,9 @@ export type Group = {
   name: string;
   memberCount: number;
   imageKey: 'roku' | 'house';
+  priceRange?: number;
+  radius?: number;
+  cuisines?: string[];
 };
 
 export type Restaurant = {
@@ -40,7 +43,7 @@ const POOL: Restaurant[] = [
     id: 'r1',
     name: 'Olive Garden',
     cuisine: 'Italian Cuisine',
-    priceLevel: 3,
+    priceLevel: 1,
     miles: 0.2,
     imageUri:
       'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400',
@@ -52,7 +55,7 @@ const POOL: Restaurant[] = [
     id: 'r2',
     name: "Raising Cane's",
     cuisine: 'American Cuisine',
-    priceLevel: 3,
+    priceLevel: 1,
     miles: 0.4,
     imageUri:
       'https://images.unsplash.com/photo-1561758033-d89a9ad46330?w=400',
@@ -63,8 +66,8 @@ const POOL: Restaurant[] = [
   {
     id: 'r3',
     name: 'Dragonfly',
-    cuisine: 'Sushi',
-    priceLevel: 2,
+    cuisine: 'Asian Cuisine',
+    priceLevel: 3,
     miles: 0.6,
     imageUri:
       'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400',
@@ -87,7 +90,7 @@ const POOL: Restaurant[] = [
   {
     id: 'r5',
     name: 'Satchel’s Pizza',
-    cuisine: 'Pizza',
+    cuisine: 'American Cuisine',
     priceLevel: 2,
     miles: 0.5,
     imageUri:
@@ -136,7 +139,8 @@ type ManeCourseContextValue = {
   resolveAfterWaiting: () => SessionState;
   resetSession: () => void;
   addMemberToGroup: (groupId: string, username: string) => void;
-  createGroup: (data: { name: string; members: string[] }) => Group;
+  createGroup: (data: { name: string; members: string[]; priceRange?: number; radius?: number; cuisines?: string[] }) => Group;
+  updateGroupSettings?: (groupId: string, updates: { priceRange?: number; radius?: number; cuisines?: string[] }) => void;
   deleteGroup: (groupId: string) => void;
 };
 
@@ -154,12 +158,21 @@ const ManeCourseContext = createContext<ManeCourseContextValue | null>(null);
 
 function buildDeckForGroup(groupId: string, factor: number, groups: Group[]): string[] {
   const g = groups.find((x) => x.id === groupId);
-  const n = g ? Math.max(1, g.memberCount * factor) : 5;
-  const out: string[] = [];
-  for (let i = 0; i < n; i++) {
-    out.push(POOL[i % POOL.length].id);
+  let filtered = POOL;
+  if (g) {
+    if (typeof g.priceRange === 'number') {
+      filtered = filtered.filter(r => r.priceLevel <= g.priceRange!);
+    }
+    if (typeof g.radius === 'number') {
+      filtered = filtered.filter(r => r.miles <= g.radius!);
+    }
+    if (g.cuisines && g.cuisines.length > 0) {
+      filtered = filtered.filter(r => g.cuisines!.some(cuisine => r.cuisine.toLowerCase().includes(cuisine.toLowerCase())));
+    }
   }
-  return out;
+  if (filtered.length === 0) return [];
+  // Each restaurant appears at most once
+  return filtered.map(r => r.id);
 }
 
 function randomLike(): boolean {
@@ -311,13 +324,16 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
     }));
   }, []);
 
-  const createGroup = useCallback((data: { name: string; members: string[] }) => {
+  const createGroup = useCallback((data: { name: string; members: string[]; priceRange?: number; radius?: number; cuisines?: string[] }) => {
     const newId = `${Date.now()}`;
     const newGroup: Group = {
       id: newId,
       name: data.name,
       memberCount: data.members.length,
       imageKey: 'roku', // default image
+      priceRange: data.priceRange,
+      radius: data.radius,
+      cuisines: data.cuisines,
     };
     setGroupsList((prev) => [...prev, newGroup]);
     // Add members to the group
@@ -340,6 +356,10 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
     setSession((prev) => (prev.groupId === groupId ? defaultSession : prev));
   }, []);
 
+  const updateGroupSettings = useCallback((groupId: string, updates: { priceRange?: number; radius?: number; cuisines?: string[] }) => {
+    setGroupsList((prev) => prev.map(g => g.id === groupId ? { ...g, ...updates } : g));
+  }, []);
+
   const value: ManeCourseContextValue = {
     groups,
     currentUser,
@@ -356,6 +376,7 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
     addMemberToGroup,
     createGroup,
     deleteGroup,
+    updateGroupSettings,
   };
 
   return (

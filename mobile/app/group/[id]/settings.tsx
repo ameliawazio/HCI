@@ -1,7 +1,8 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,32 +15,73 @@ import { useManeCourse, MEMBER_USERNAMES } from '../../../context/ManeCourseCont
 import { colors, radii, spacing } from '../../../constants/theme';
 
 const CUISINES = [
-  'Asian',
-  'Mediterranean',
-  'Latin American',
   'American',
+  'Asian',
+  'Italian',
+  'Latin',
+  'Mediterranean',
   'European',
+  'Mexican',
+  'Indian',
 ];
 
 export default function GroupSettingsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { groupMembersByGroupId, createGroup } = useManeCourse();
+  const { groups, groupMembersByGroupId, createGroup, updateGroupSettings } = useManeCourse();
   const normalizedId = Array.isArray(id) ? id[0] : id;
   const gid = normalizedId === 'new' ? 'new' : (normalizedId ?? '1');
+  const existingGroup = groups.find((g) => g.id === gid);
   const [groupName, setGroupName] = useState(
-    normalizedId === 'new' ? 'New group' : 'The Roku Remotes',
+    existingGroup?.name ?? (normalizedId === 'new' ? 'New group' : 'The Roku Remotes'),
   );
   const [addUser, setAddUser] = useState('');
-  const [radius, setRadius] = useState(0.3);
-  const [priceRange, setPriceRange] = useState(2);
+  const [radius, setRadius] = useState(existingGroup?.radius ?? 2);
+  const [priceRange, setPriceRange] = useState(existingGroup?.priceRange ?? 4);
   const [selectedCuisines, setSelectedCuisines] = useState<Set<string>>(
-    new Set(),
+    new Set(existingGroup?.cuisines ?? CUISINES),
   );
   const [newMembers, setNewMembers] = useState<string[]>([]);
+
+  // Slider
+  const trackWidthRef = useRef(0);
+  const radiusAtGestureStart = useRef(radius);
+  const sliderPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (e) => {
+        if (trackWidthRef.current === 0) return;
+        // Snap thumb to the tap position immediately
+        const x = Math.max(0, Math.min(trackWidthRef.current, e.nativeEvent.locationX));
+        const newVal = Math.round((x / trackWidthRef.current) * 20) / 10;
+        radiusAtGestureStart.current = newVal;
+        setRadius(newVal);
+      },
+      onPanResponderMove: (_e, gestureState) => {
+        if (trackWidthRef.current === 0) return;
+        // Use dx (delta from gesture start) so dragging is smooth regardless of which
+        // view the finger is over
+        const delta = (gestureState.dx / trackWidthRef.current) * 2;
+        const newVal = Math.round(
+          Math.max(0, Math.min(2, radiusAtGestureStart.current + delta)) * 10,
+        ) / 10;
+        setRadius(newVal);
+      },
+    }),
+  ).current;
 
   const members =
     groupMembersByGroupId[gid] ||
     MEMBER_USERNAMES.slice(0, 4);
+
+  const handleSaveSettings = () => {
+    updateGroupSettings?.(gid, {
+      priceRange,
+      radius,
+      cuisines: Array.from(selectedCuisines),
+    });
+    router.back();
+  };
 
   const handleToggleCuisine = (cuisine: string) => {
     setSelectedCuisines((prev) => {
@@ -62,6 +104,9 @@ export default function GroupSettingsScreen() {
     const newGroup = createGroup({
       name: groupName,
       members: allMembers,
+      priceRange,
+      radius,
+      cuisines: Array.from(selectedCuisines),
     });
     router.replace(`/group/${newGroup.id}/swipe`);
   };
@@ -115,20 +160,20 @@ export default function GroupSettingsScreen() {
           ))}
         </View>
 
-        <Text style={styles.label}>Radius</Text>
+        <Text style={styles.label}>Radius: {radius.toFixed(1)} mi</Text>
         <View style={styles.sliderRow}>
-          <View style={[styles.track, { flex: 1 }]}>
-            <View
-              style={[styles.thumb, { left: `${radius * 100}%` }]}
-            />
+          <View
+            style={[styles.track, { flex: 1 }]}
+            onLayout={(e) => { trackWidthRef.current = e.nativeEvent.layout.width; }}
+            {...sliderPanResponder.panHandlers}
+          >
+            <View style={[styles.thumb, { left: `${(radius / 2) * 100}%` as any }]} />
           </View>
         </View>
-        <Pressable
-          onPress={() => setRadius((r) => (r > 0.1 ? r - 0.1 : r))}
-          style={styles.sliderHint}
-        >
-          <Text style={styles.hintText}>Tap track to adjust (demo)</Text>
-        </Pressable>
+        <View style={styles.sliderLabels}>
+          <Text style={styles.hintText}>0 mi</Text>
+          <Text style={styles.hintText}>2 mi</Text>
+        </View>
 
         <Text style={styles.label}>Cuisine Types</Text>
         <View style={styles.chips}>
@@ -182,9 +227,13 @@ export default function GroupSettingsScreen() {
           }}
         />
 
-        {normalizedId === 'new' && (
+        {normalizedId === 'new' ? (
           <Pressable style={styles.createButton} onPress={handleCreateGroup}>
             <Text style={styles.createButtonText}>Create Group</Text>
+          </Pressable>
+        ) : (
+          <Pressable style={styles.createButton} onPress={handleSaveSettings}>
+            <Text style={styles.createButtonText}>Save Settings</Text>
           </Pressable>
         )}
       </ScrollView>
@@ -256,7 +305,7 @@ const styles = StyleSheet.create({
     marginTop: -7,
     marginLeft: -11,
   },
-  sliderHint: { marginTop: 8 },
+  sliderLabels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
   hintText: { color: colors.greyText, fontSize: 12 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
