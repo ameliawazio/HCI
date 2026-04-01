@@ -3,6 +3,7 @@ import math
 import os
 import secrets
 import sqlite3
+import time
 from datetime import datetime, timezone
 from functools import wraps
 from typing import Any
@@ -12,8 +13,14 @@ from flask import Flask, g, jsonify, render_template, request
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "manecourse.db")
 PLACES_API_KEY = os.environ.get("GOOGLE_PLACES_API_KEY", "")
-RESTAURANTS_PER_MEMBER = 3
 MAX_DECK_SIZE = 30
+
+
+def deck_size_for_member_count(member_count: int) -> int:
+    """5 restaurants for a 2-person group; +2 for each additional member."""
+    if member_count < 1:
+        return max(1, min(MAX_DECK_SIZE, 5))
+    return max(1, min(MAX_DECK_SIZE, 5 + 2 * max(0, member_count - 2)))
 
 app = Flask(__name__)
 
@@ -39,6 +46,20 @@ def close_db(_exc: BaseException | None) -> None:
     db = getattr(g, "_db", None)
     if db is not None:
         db.close()
+
+
+def _apply_schema_migrations(db: sqlite3.Connection) -> None:
+    """Add columns on existing SQLite files (CREATE IF NOT EXISTS does not upgrade)."""
+    for table, col, decl in (
+        ("groups", "settings_version", "INTEGER NOT NULL DEFAULT 1"),
+        ("rounds", "settings_version", "INTEGER NOT NULL DEFAULT 1"),
+        ("rounds", "member_count", "INTEGER NOT NULL DEFAULT 1"),
+    ):
+        try:
+            db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+        except sqlite3.OperationalError:
+            pass
+    db.commit()
 
 
 def init_db() -> None:
@@ -70,7 +91,8 @@ def init_db() -> None:
             price_min INTEGER NOT NULL DEFAULT 1,
             price_max INTEGER NOT NULL DEFAULT 3,
             cuisines_json TEXT NOT NULL DEFAULT '[]',
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            settings_version INTEGER NOT NULL DEFAULT 1
         );
 
         CREATE TABLE IF NOT EXISTS group_members (
@@ -92,7 +114,9 @@ def init_db() -> None:
             latitude REAL NOT NULL,
             longitude REAL NOT NULL,
             created_at TEXT NOT NULL,
-            resolved_at TEXT
+            resolved_at TEXT,
+            settings_version INTEGER NOT NULL DEFAULT 1,
+            member_count INTEGER NOT NULL DEFAULT 1
         );
 
         CREATE TABLE IF NOT EXISTS round_restaurants (
@@ -131,6 +155,17 @@ def init_db() -> None:
         );
         """
     )
+    _apply_schema_migrations(db)
+    ts = now_iso()
+    for i in range(1, 6):
+        u = f"gator{i}"
+        db.execute(
+            """
+            INSERT OR IGNORE INTO users(username, email, full_name, password, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (u, f"{u}@demo.local", f"Demo User {i}", "password", ts),
+        )
     db.commit()
     db.close()
 
@@ -216,6 +251,42 @@ def get_active_round(group_id: int) -> sqlite3.Row | None:
     ).fetchone()
 
 
+def abort_active_rounds_for_group(group_id: int) -> None:
+    """Remove in-progress rounds so the next start builds a fresh deck (votes/restaurants do not carry over)."""
+    db = get_db()
+    rows = db.execute(
+        "SELECT id FROM rounds WHERE group_id = ? AND status = 'active'",
+        (group_id,),
+    ).fetchall()
+    for row in rows:
+        db.execute("DELETE FROM rounds WHERE id = ?", (row["id"],))
+    db.commit()
+
+
+def swipe_in_progress(group_id: int) -> bool:
+    """True if an active round exists and at least one member has not finished swiping."""
+    active = get_active_round(group_id)
+    if not active:
+        return False
+    db = get_db()
+    n = db.execute(
+        """
+        SELECT COUNT(*) AS c
+        FROM round_participants
+        WHERE round_id = ? AND completed = 0
+        """,
+        (active["id"],),
+    ).fetchone()["c"]
+    return int(n or 0) > 0
+
+
+def group_settings_version(group_row: sqlite3.Row) -> int:
+    try:
+        return int(group_row["settings_version"])
+    except (KeyError, TypeError, ValueError):
+        return 1
+
+
 def get_round_deck(round_id: int) -> list[dict[str, Any]]:
     db = get_db()
     rows = db.execute(
@@ -245,43 +316,23 @@ def get_round_deck(round_id: int) -> list[dict[str, Any]]:
     ]
 
 
-def search_nearby_places(
+def _append_place_results(
+    raw_results: list[dict[str, Any]],
     latitude: float,
     longitude: float,
-    radius_miles: float,
-    price_min: int,
-    price_max: int,
     cuisines: list[str],
-) -> list[dict[str, Any]]:
-    if not PLACES_API_KEY:
-        raise RuntimeError(
-            "GOOGLE_PLACES_API_KEY is not configured on the backend environment."
-        )
-
-    radius_meters = max(100, int(radius_miles * 1609.34))
-    params = {
-        "location": f"{latitude},{longitude}",
-        "radius": radius_meters,
-        "type": "restaurant",
-        "key": PLACES_API_KEY,
-        "minprice": max(0, price_min),
-        "maxprice": min(4, price_max),
-    }
-    url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
-    resp = requests.get(url, params=params, timeout=15)
-    resp.raise_for_status()
-    payload = resp.json()
-    if payload.get("status") not in {"OK", "ZERO_RESULTS"}:
-        raise RuntimeError(payload.get("error_message") or payload.get("status"))
-
+    seen_ids: set[str],
+    out: list[dict[str, Any]],
+) -> None:
     cuisine_terms = {c.lower().strip() for c in cuisines if c.strip()}
-    results: list[dict[str, Any]] = []
-    for r in payload.get("results", []):
+    for r in raw_results:
         place_id = r.get("place_id")
         geom = (r.get("geometry") or {}).get("location") or {}
         lat = geom.get("lat")
         lng = geom.get("lng")
         if not place_id or lat is None or lng is None:
+            continue
+        if place_id in seen_ids:
             continue
 
         name = r.get("name") or "Unknown restaurant"
@@ -292,6 +343,7 @@ def search_nearby_places(
         ):
             continue
 
+        seen_ids.add(place_id)
         distance = haversine_miles(latitude, longitude, float(lat), float(lng))
         cuisine_guess = next(
             (t for t in types if "restaurant" in t and t != "restaurant"),
@@ -303,7 +355,7 @@ def search_nearby_places(
             if photo_ref
             else None
         )
-        results.append(
+        out.append(
             {
                 "placeId": place_id,
                 "name": name,
@@ -318,7 +370,62 @@ def search_nearby_places(
             }
         )
 
-    # Deterministic order for fairness.
+
+def search_nearby_places(
+    latitude: float,
+    longitude: float,
+    radius_miles: float,
+    price_min: int,
+    price_max: int,
+    cuisines: list[str],
+    *,
+    min_results: int = 15,
+) -> list[dict[str, Any]]:
+    if not PLACES_API_KEY:
+        raise RuntimeError(
+            "GOOGLE_PLACES_API_KEY is not configured on the backend environment."
+        )
+
+    radius_meters = max(100, int(radius_miles * 1609.34))
+    base_params: dict[str, Any] = {
+        "location": f"{latitude},{longitude}",
+        "radius": radius_meters,
+        "type": "restaurant",
+        "key": PLACES_API_KEY,
+        "minprice": max(0, price_min),
+        "maxprice": min(4, price_max),
+    }
+    url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+    seen_ids: set[str] = set()
+    results: list[dict[str, Any]] = []
+    pagetoken: str | None = None
+
+    for _ in range(4):
+        params = dict(base_params)
+        if pagetoken:
+            params["pagetoken"] = pagetoken
+        resp = requests.get(url, params=params, timeout=15)
+        resp.raise_for_status()
+        payload = resp.json()
+        st = payload.get("status")
+        if st not in {"OK", "ZERO_RESULTS"}:
+            raise RuntimeError(payload.get("error_message") or str(st))
+
+        _append_place_results(
+            payload.get("results") or [],
+            latitude,
+            longitude,
+            cuisines,
+            seen_ids,
+            results,
+        )
+        if len(results) >= min_results:
+            break
+        pagetoken = payload.get("next_page_token")
+        if not pagetoken:
+            break
+        time.sleep(2.0)
+
     results.sort(key=lambda x: (x["distanceMiles"], x["placeId"]))
     return results
 
@@ -341,13 +448,18 @@ def create_round(
         ).fetchone()["n"]
     )
 
+    sv = group_settings_version(group)
+    mc = len(members)
     round_id = db.execute(
         """
-        INSERT INTO rounds(group_id, round_number, status, latitude, longitude, created_at)
-        VALUES (?, ?, 'active', ?, ?, ?)
+        INSERT INTO rounds(
+            group_id, round_number, status, latitude, longitude, created_at,
+            settings_version, member_count
+        )
+        VALUES (?, ?, 'active', ?, ?, ?, ?, ?)
         RETURNING id
         """,
-        (group_id, next_round_number, latitude, longitude, now_iso()),
+        (group_id, next_round_number, latitude, longitude, now_iso(), sv, mc),
     ).fetchone()["id"]
 
     for idx, restaurant in enumerate(restaurants):
@@ -511,17 +623,6 @@ def index():
     return render_template("index.html")
 
 
-@app.post("/api/login")
-def login():
-    data = request.get_json(silent=True) or {}
-    username = data.get("username", "")
-    password = data.get("password", "")
-
-    if VALID_USERS.get(username) == password:
-        return jsonify({"success": True, "message": "Login successful"})
-    return jsonify({"success": False, "message": "Invalid username or password"}), 401
-
-
 @app.get("/home")
 def home():
     return render_template("home.html")
@@ -554,48 +655,14 @@ def restaurant_detail_page(restaurant_id: int):
 
 @app.post("/api/auth/signup")
 def signup():
-    data = request.get_json(silent=True) or {}
-    username = (data.get("username") or "").strip()
-    email = (data.get("email") or "").strip().lower()
-    full_name = (data.get("fullName") or "").strip()
-    password = data.get("password") or ""
-    if not username or not email or not full_name or not password:
-        return jsonify({"error": "username, email, fullName, and password are required"}), 400
-
-    db = get_db()
-    try:
-        user_id = db.execute(
-            """
-            INSERT INTO users(username, email, full_name, password, created_at)
-            VALUES (?, ?, ?, ?, ?)
-            RETURNING id
-            """,
-            (username, email, full_name, password, now_iso()),
-        ).fetchone()["id"]
-    except sqlite3.IntegrityError:
-        return jsonify({"error": "Username or email already exists"}), 409
-
-    token = secrets.token_urlsafe(32)
-    db.execute(
-        "INSERT INTO auth_tokens(token, user_id, created_at) VALUES (?, ?, ?)",
-        (token, user_id, now_iso()),
-    )
-    db.commit()
+    """Registration is disabled; demo uses pre-seeded sample users (see VALID_USERS)."""
     return jsonify(
-        {
-            "token": token,
-            "user": {
-                "id": user_id,
-                "username": username,
-                "email": email,
-                "fullName": full_name,
-            },
-        }
-    )
+        {"error": "Registration is disabled in this demo. Sign in with a sample account (gator1–gator5)."}
+    ), 403
 
 
 @app.post("/api/auth/login")
-def login():
+def auth_login():
     data = request.get_json(silent=True) or {}
     username = (data.get("username") or "").strip()
     password = data.get("password") or ""
@@ -719,6 +786,7 @@ def get_group_settings(group_id: int):
         {
             "group": group_to_json(group),
             "members": [m["username"] for m in members],
+            "swipeInProgress": swipe_in_progress(group_id),
         }
     )
 
@@ -729,6 +797,13 @@ def update_group_settings(group_id: int):
     group = ensure_group_member(group_id)
     if not group:
         return jsonify({"error": "Group not found"}), 404
+    if swipe_in_progress(group_id):
+        return jsonify(
+            {
+                "error": "Cannot change settings while someone is still swiping. "
+                "Wait until everyone finishes or the round completes.",
+            }
+        ), 409
     data = request.get_json(silent=True) or {}
     name = (data.get("name") or group["name"]).strip()
     radius = float(data.get("radiusMiles") or group["radius_miles"])
@@ -745,12 +820,14 @@ def update_group_settings(group_id: int):
     db.execute(
         """
         UPDATE groups
-        SET name = ?, radius_miles = ?, price_min = ?, price_max = ?, cuisines_json = ?
+        SET name = ?, radius_miles = ?, price_min = ?, price_max = ?, cuisines_json = ?,
+            settings_version = settings_version + 1
         WHERE id = ?
         """,
         (name, radius, price_min, price_max, json.dumps(cuisines), group_id),
     )
     db.commit()
+    abort_active_rounds_for_group(group_id)
     updated = db.execute("SELECT * FROM groups WHERE id = ?", (group_id,)).fetchone()
     return jsonify({"group": group_to_json(updated)})
 
@@ -782,6 +859,7 @@ def add_group_member(group_id: int):
     except sqlite3.IntegrityError:
         return jsonify({"error": "User is already in the group"}), 409
 
+    abort_active_rounds_for_group(group_id)
     return jsonify({"ok": True})
 
 
@@ -792,11 +870,41 @@ def start_round(group_id: int):
     if not group:
         return jsonify({"error": "Group not found"}), 404
 
+    db = get_db()
+    member_count = int(
+        db.execute(
+            "SELECT COUNT(*) AS c FROM group_members WHERE group_id = ?",
+            (group_id,),
+        ).fetchone()["c"]
+        or 0
+    )
     existing = get_active_round(group_id)
     if existing:
-        return jsonify(
-            {"round": {"id": existing["id"], "roundNumber": existing["round_number"]}, "deck": get_round_deck(existing["id"])}
+        gsv = group_settings_version(group)
+        ex_sv = int(existing["settings_version"] or 1)
+        ex_mc = int(existing["member_count"] or 0)
+        rp = int(
+            db.execute(
+                "SELECT COUNT(*) AS c FROM round_participants WHERE round_id = ?",
+                (existing["id"],),
+            ).fetchone()["c"]
+            or 0
         )
+        if (
+            ex_sv == gsv
+            and ex_mc == member_count
+            and rp == member_count
+        ):
+            return jsonify(
+                {
+                    "round": {
+                        "id": existing["id"],
+                        "roundNumber": existing["round_number"],
+                    },
+                    "deck": get_round_deck(existing["id"]),
+                }
+            )
+    abort_active_rounds_for_group(group_id)
 
     data = request.get_json(silent=True) or {}
     latitude = float(data.get("latitude") or 29.6516)
@@ -807,10 +915,7 @@ def start_round(group_id: int):
         "price_max": int(group["price_max"]),
         "cuisines": json.loads(group["cuisines_json"] or "[]"),
     }
-    member_count = get_db().execute(
-        "SELECT COUNT(*) AS c FROM group_members WHERE group_id = ?", (group_id,)
-    ).fetchone()["c"]
-    wanted_count = max(1, min(MAX_DECK_SIZE, member_count * RESTAURANTS_PER_MEMBER))
+    wanted_count = deck_size_for_member_count(member_count)
     attempt_configs = [
         # 1) Strictly honor all user settings.
         {
@@ -858,6 +963,7 @@ def start_round(group_id: int):
                 cfg["price_min"],
                 cfg["price_max"],
                 cfg["cuisines"],
+                min_results=wanted_count,
             )
             if candidates:
                 places = candidates

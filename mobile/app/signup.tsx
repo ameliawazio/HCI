@@ -1,5 +1,4 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -7,36 +6,14 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { colors, radii, spacing } from '../constants/theme';
-import { useManeCourse } from '../context/ManeCourseContext';
+import { SAMPLE_PASSWORD, SAMPLE_USERNAMES } from '../lib/sampleUsers';
 
 export default function SignUpScreen() {
-  const { signup, loading } = useManeCourse();
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [user, setUser] = useState('');
-  const [pass, setPass] = useState('');
-  const [error, setError] = useState('');
-
-  const handleSignup = async () => {
-    try {
-      setError('');
-      await signup({
-        username: user.trim(),
-        fullName: fullName.trim(),
-        email: email.trim(),
-        password: pass,
-      });
-      router.replace('/home');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign up failed');
-    }
-  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -59,64 +36,25 @@ export default function SignUpScreen() {
         >
           <View style={styles.hero}>
             <Text style={styles.heroEyebrow}>ManeCourse</Text>
-            <Text style={styles.heroTitle}>Join The Stable</Text>
+            <Text style={styles.heroTitle}>Demo accounts</Text>
             <Text style={styles.heroSub}>
-              Set up your profile and start matching your group with great food.
+              New accounts are not created in this demo. Sign in with a sample user on the
+              login screen.
             </Text>
           </View>
 
           <View style={styles.formCard}>
-            <View style={styles.formFields}>
-              <Text style={styles.label}>Full Name</Text>
-              <TextInput
-                value={fullName}
-                onChangeText={setFullName}
-                style={styles.input}
-                placeholder="Enter your full name"
-                placeholderTextColor={colors.greyText}
-                autoCapitalize="words"
-              />
-
-              <Text style={styles.label}>Email</Text>
-              <TextInput
-                value={email}
-                onChangeText={setEmail}
-                style={styles.input}
-                placeholder="Enter your email"
-                placeholderTextColor={colors.greyText}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-
-              <Text style={styles.label}>Username</Text>
-              <TextInput
-                value={user}
-                onChangeText={setUser}
-                style={styles.input}
-                placeholder="Choose a username"
-                placeholderTextColor={colors.greyText}
-                autoCapitalize="none"
-              />
-
-              <Text style={styles.label}>Password</Text>
-              <TextInput
-                value={pass}
-                onChangeText={setPass}
-                style={styles.input}
-                placeholder="Create a password"
-                placeholderTextColor={colors.greyText}
-                secureTextEntry
-              />
-            </View>
+            <Text style={styles.label}>Sample usernames</Text>
+            <Text style={styles.sampleList}>{SAMPLE_USERNAMES.join(', ')}</Text>
+            <Text style={styles.label}>Password (all users)</Text>
+            <Text style={styles.samplePassword}>{SAMPLE_PASSWORD}</Text>
 
             <View style={styles.formBottom}>
               <PrimaryButton
-                title="Create Account"
-                onPress={handleSignup}
+                title="Go to Login"
+                onPress={() => router.replace('/login')}
                 style={styles.btn}
               />
-              {!!error && <Text style={styles.errorText}>{error}</Text>}
-              {loading && <Text style={styles.loadingText}>Creating account...</Text>}
 
               <Text style={styles.footer}>
                 Already have an account?{' '}
@@ -196,9 +134,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     justifyContent: 'flex-start',
   },
-  formFields: {
-    gap: 2,
-  },
   formBottom: {
     flex: 1,
     justifyContent: 'center',
@@ -209,6 +144,19 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 6,
     marginTop: 6,
+  },
+  sampleList: {
+    color: colors.brownDark,
+    fontSize: 15,
+    lineHeight: 22,
+    marginBottom: spacing.sm,
+  },
+  samplePassword: {
+    color: colors.brownDark,
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginBottom: spacing.sm,
   },
   input: {
     backgroundColor: colors.white,
@@ -233,16 +181,5 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textDecorationLine: 'underline',
     color: colors.brown,
-  },
-  errorText: {
-    color: '#7A1313',
-    textAlign: 'center',
-    marginTop: 8,
-    fontWeight: '700',
-  },
-  loadingText: {
-    color: colors.brownDark,
-    textAlign: 'center',
-    marginTop: 8,
   },
 });

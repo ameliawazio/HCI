@@ -15,9 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { colors, radii, spacing } from '../constants/theme';
 import { useManeCourse } from '../context/ManeCourseContext';
-
-const VALID_USERS = new Set(['gator1', 'gator2', 'gator3', 'gator4', 'gator5']);
-const VALID_PASSWORD = 'password';
+import { isSampleAccount } from '../lib/sampleUsers';
 
 export default function LoginScreen() {
   const { login, loading } = useManeCourse();
@@ -25,14 +23,19 @@ export default function LoginScreen() {
   const [pass, setPass] = useState('');
   const [error, setError] = useState('');
 
-  function handleLogin() {
+  async function handleLogin() {
     const username = user.trim().toLowerCase();
-    if (VALID_USERS.has(username) && pass === VALID_PASSWORD) {
-      setError('');
-      router.replace('/home');
+    setError('');
+    if (!isSampleAccount(username, pass)) {
+      setError('Use a sample username (gator1–gator5) and password.');
       return;
     }
-    setError('Invalid login.');
+    try {
+      await login(username, pass);
+      router.replace('/home');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed');
+    }
   }
 
   return (
@@ -102,14 +105,14 @@ export default function LoginScreen() {
             <View style={styles.formBottom}>
               <PrimaryButton
                 title="Login"
-                onPress={handleLogin}
+                onPress={() => void handleLogin()}
                 style={styles.btn}
               />
 
-              <Pressable onPress={() => {}} hitSlop={10}>
-                {error ? <Text style={styles.error}>{error}</Text> : null}
-          <Text style={styles.forgot}>Forgot password?</Text>
-              </Pressable>
+              {!!error && <Text style={styles.error}>{error}</Text>}
+              {loading && <Text style={styles.loadingText}>Signing in…</Text>}
+
+              <Text style={styles.forgot}>Forgot password?</Text>
 
               <Text style={styles.footer}>
                 Don't have an account?{' '}
@@ -267,24 +270,23 @@ const styles = StyleSheet.create({
     borderColor: '#E4D5C1',
     marginBottom: 8,
   },
-  loginBtn: { marginTop: 8, marginBottom: 24 },
-  forgot: { color: colors.white, textAlign: 'center', fontSize: 13 },
-  errorText: {
-    color: '#FFE3E3',
+  btn: {
+    marginTop: 0,
+    marginBottom: 8,
+    backgroundColor: colors.brownDark,
+    borderWidth: 1,
+    borderColor: '#5E4332',
+  },
+  error: {
+    color: '#7A1313',
     textAlign: 'center',
     fontWeight: '700',
     marginBottom: 8,
   },
-  loadingText: { color: colors.white, textAlign: 'center', marginBottom: 8 },
-  link: {
-    color: colors.white,
+  loadingText: {
+    color: colors.brownDark,
     textAlign: 'center',
-    fontWeight: '700',
-    marginBottom: 16,
-  },
-    backgroundColor: colors.brownDark,
-    borderWidth: 1,
-    borderColor: '#5E4332',
+    marginBottom: 8,
   },
   forgot: {
     color: '#B71C1C',

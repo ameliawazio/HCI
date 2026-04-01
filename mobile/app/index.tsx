@@ -131,7 +131,6 @@ const styles = StyleSheet.create({
     height: 10,
     borderRadius: 5,
     backgroundColor: 'rgba(75, 54, 33, 0.2)',
-    transition: 'all 0.3s ease',
   },
   dotActive: {
     backgroundColor: colors.brown,

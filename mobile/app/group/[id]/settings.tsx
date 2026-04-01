@@ -1,8 +1,8 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useRef, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
-  PanResponder,
   Alert,
   ActivityIndicator,
   Pressable,
@@ -38,93 +38,61 @@ export default function GroupSettingsScreen() {
   } = useManeCourse();
   const normalizedId = Array.isArray(id) ? id[0] : id;
   const gid = normalizedId === 'new' ? 'new' : (normalizedId ?? '1');
-  const existingGroup = groups.find((g) => g.id === gid);
   const [groupName, setGroupName] = useState(
-    existingGroup?.name ?? (normalizedId === 'new' ? 'New group' : 'The Roku Remotes'),
+    normalizedId === 'new' ? 'New group' : '',
   );
   const [addUser, setAddUser] = useState('');
-  const [radius, setRadius] = useState(existingGroup?.radius ?? 2);
-  const [priceRange, setPriceRange] = useState(existingGroup?.priceRange ?? 4);
+  const [radius, setRadius] = useState(5);
+  const [priceRange, setPriceRange] = useState(2);
+  const [priceMin, setPriceMin] = useState(1);
   const [selectedCuisines, setSelectedCuisines] = useState<Set<string>>(
-    new Set(existingGroup?.cuisines ?? CUISINES),
+    () => new Set(CUISINES),
   );
   const [newMembers, setNewMembers] = useState<string[]>([]);
-
-  // Slider
-  const trackWidthRef = useRef(0);
-  const radiusAtGestureStart = useRef(radius);
-  const sliderPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (e) => {
-        if (trackWidthRef.current === 0) return;
-        // Snap thumb to the tap position immediately
-        const x = Math.max(0, Math.min(trackWidthRef.current, e.nativeEvent.locationX));
-        const newVal = Math.round((x / trackWidthRef.current) * 20) / 10;
-        radiusAtGestureStart.current = newVal;
-        setRadius(newVal);
-      },
-      onPanResponderMove: (_e, gestureState) => {
-        if (trackWidthRef.current === 0) return;
-        // Use dx (delta from gesture start) so dragging is smooth regardless of which
-        // view the finger is over
-        const delta = (gestureState.dx / trackWidthRef.current) * 2;
-        const newVal = Math.round(
-          Math.max(0, Math.min(2, radiusAtGestureStart.current + delta)) * 10,
-        ) / 10;
-        setRadius(newVal);
-      },
-    }),
-  ).current;
-
-  const members =
-    groupMembersByGroupId[gid] ||
-    MEMBER_USERNAMES.slice(0, 4);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(normalizedId !== 'new');
   const [trackWidth, setTrackWidth] = useState(1);
+  const [swipeLocked, setSwipeLocked] = useState(false);
 
   const members = groupMembersByGroupId[gid] || MEMBER_USERNAMES.slice(0, 4);
   const priceMax = priceRange;
+  const controlsDisabled = swipeLocked && normalizedId !== 'new';
 
-  useEffect(() => {
-    if (!normalizedId || normalizedId === 'new') return;
-    let mounted = true;
-    setLoading(true);
-    getGroupSettings(normalizedId)
-      .then((res) => {
-        if (!mounted) return;
-        setGroupName(res.group.name);
-        setRadius(res.group.settings.radiusMiles);
-        setPriceRange(res.group.settings.priceMax);
-        setPriceMin(res.group.settings.priceMin);
-        setSelectedCuisines(new Set(res.group.settings.cuisines));
-      })
-      .catch((err) => {
-        Alert.alert('Failed to load settings', err instanceof Error ? err.message : 'Unknown error');
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [getGroupSettings, normalizedId]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!normalizedId || normalizedId === 'new') {
+        setLoading(false);
+        setSwipeLocked(false);
+        return;
+      }
+      let mounted = true;
+      setLoading(true);
+      getGroupSettings(normalizedId)
+        .then((res) => {
+          if (!mounted) return;
+          setGroupName(res.group.name);
+          setRadius(res.group.settings.radiusMiles);
+          setPriceRange(res.group.settings.priceMax);
+          setPriceMin(res.group.settings.priceMin);
+          setSelectedCuisines(new Set(res.group.settings.cuisines));
+          setSwipeLocked(res.swipeInProgress ?? false);
+        })
+        .catch((err) => {
+          Alert.alert('Failed to load settings', err instanceof Error ? err.message : 'Unknown error');
+        })
+        .finally(() => {
+          if (mounted) setLoading(false);
+        });
+      return () => {
+        mounted = false;
+      };
+    }, [getGroupSettings, normalizedId]),
+  );
 
   const radiusPercent = useMemo(
     () => Math.max(0, Math.min(1, (radius - 1) / 19)),
     [radius],
   );
-
-  const handleSaveSettings = () => {
-    updateGroupSettings?.(gid, {
-      priceRange,
-      radius,
-      cuisines: Array.from(selectedCuisines),
-    });
-    router.back();
-  };
 
   const handleToggleCuisine = (cuisine: string) => {
     setSelectedCuisines((prev) => {
@@ -205,6 +173,13 @@ export default function GroupSettingsScreen() {
         </Pressable>
       </View>
       <ScrollView contentContainerStyle={styles.scroll}>
+        {controlsDisabled && (
+          <View style={styles.lockBanner}>
+            <Text style={styles.lockBannerText}>
+              Someone is still swiping. Settings are locked until everyone finishes this round.
+            </Text>
+          </View>
+        )}
         <Image
           source={{
             uri: 'https://images.unsplash.com/photo-1593789196529-4a366615a65e?w=400',
@@ -215,9 +190,10 @@ export default function GroupSettingsScreen() {
 
         <Text style={styles.label}>Group Name</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, controlsDisabled && styles.inputDisabled]}
           value={groupName}
           onChangeText={setGroupName}
+          editable={!controlsDisabled}
         />
 
         <Text style={styles.label}>Price Range</Text>
@@ -226,6 +202,7 @@ export default function GroupSettingsScreen() {
             <Pressable
               key={level}
               onPress={() => setPriceRange(level)}
+              disabled={controlsDisabled}
               style={[
                 styles.priceButton,
                 priceRange >= level && styles.priceButtonActive,
@@ -247,6 +224,7 @@ export default function GroupSettingsScreen() {
         <View style={styles.radiusControls}>
           <Pressable
             style={styles.radiusButton}
+            disabled={controlsDisabled}
             onPress={() => setRadius((r) => Math.max(1, r - 1))}
           >
             <Text style={styles.radiusButtonText}>-</Text>
@@ -254,6 +232,7 @@ export default function GroupSettingsScreen() {
           <Text style={styles.radiusValue}>{radius} mi</Text>
           <Pressable
             style={styles.radiusButton}
+            disabled={controlsDisabled}
             onPress={() => setRadius((r) => Math.min(20, r + 1))}
           >
             <Text style={styles.radiusButtonText}>+</Text>
@@ -262,8 +241,10 @@ export default function GroupSettingsScreen() {
         <View style={styles.sliderRow}>
           <Pressable
             style={[styles.track, { flex: 1 }]}
+            disabled={controlsDisabled}
             onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width || 1)}
             onPressIn={(e) => {
+              if (controlsDisabled) return;
               const x = e.nativeEvent.locationX;
               const pct = Math.max(0, Math.min(1, x / trackWidth));
               const nextRadius = 1 + pct * 19;
@@ -274,18 +255,8 @@ export default function GroupSettingsScreen() {
               style={[styles.thumb, { left: `${radiusPercent * 100}%` }]}
             />
           </Pressable>
-          <View
-            style={[styles.track, { flex: 1 }]}
-            onLayout={(e) => { trackWidthRef.current = e.nativeEvent.layout.width; }}
-            {...sliderPanResponder.panHandlers}
-          >
-            <View style={[styles.thumb, { left: `${(radius / 2) * 100}%` as any }]} />
-          </View>
         </View>
-        <View style={styles.sliderLabels}>
-          <Text style={styles.hintText}>0 mi</Text>
-          <Text style={styles.hintText}>2 mi</Text>
-        </View>
+        <Text style={styles.hintText}>{radius} miles</Text>
 
         <Text style={styles.label}>Cuisine Types</Text>
         <View style={styles.chips}>
@@ -293,6 +264,7 @@ export default function GroupSettingsScreen() {
             <Pressable
               key={c}
               onPress={() => handleToggleCuisine(c)}
+              disabled={controlsDisabled}
               style={[
                 styles.chip,
                 selectedCuisines.has(c) && styles.chipActive,
@@ -326,12 +298,14 @@ export default function GroupSettingsScreen() {
           ))}
         </View>
         <TextInput
-          style={styles.input}
+          style={[styles.input, controlsDisabled && styles.inputDisabled]}
           placeholder="Add member..."
           placeholderTextColor={colors.greyText}
           value={addUser}
           onChangeText={setAddUser}
+          editable={!controlsDisabled}
           onSubmitEditing={() => {
+            if (controlsDisabled) return;
             if (addUser.trim()) {
               if (normalizedId === 'new') {
                 setNewMembers([...newMembers, addUser.trim()]);
@@ -347,18 +321,17 @@ export default function GroupSettingsScreen() {
           }}
         />
 
-        {normalizedId === 'new' && (
+        {normalizedId === 'new' ? (
           <Pressable style={styles.createButton} onPress={handleCreateGroup} disabled={saving}>
             <Text style={styles.createButtonText}>{saving ? 'Creating...' : 'Create Group'}</Text>
           </Pressable>
-        )}
-        {normalizedId !== 'new' && (
-          <Pressable style={styles.createButton} onPress={handleSaveExisting} disabled={saving}>
-            <Text style={styles.createButtonText}>{saving ? 'Saving...' : 'Save & Start Swiping'}</Text>
-          </Pressable>
         ) : (
-          <Pressable style={styles.createButton} onPress={handleSaveSettings}>
-            <Text style={styles.createButtonText}>Save Settings</Text>
+          <Pressable
+            style={[styles.createButton, controlsDisabled && styles.createButtonDisabled]}
+            onPress={handleSaveExisting}
+            disabled={saving || controlsDisabled}
+          >
+            <Text style={styles.createButtonText}>{saving ? 'Saving...' : 'Save & Start Swiping'}</Text>
           </Pressable>
         )}
       </ScrollView>
@@ -368,6 +341,23 @@ export default function GroupSettingsScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.white },
+  lockBanner: {
+    backgroundColor: '#FFF3E0',
+    borderRadius: radii.card,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: '#FFCC80',
+  },
+  lockBannerText: {
+    color: '#E65100',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  inputDisabled: { opacity: 0.55 },
+  createButtonDisabled: { opacity: 0.5 },
   bar: {
     flexDirection: 'row',
     justifyContent: 'space-between',

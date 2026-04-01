@@ -99,7 +99,7 @@ export const api = {
       token,
     }),
   getGroupSettings: (token: string, groupId: number) =>
-    apiRequest<{ group: GroupSummary; members: string[] }>(
+    apiRequest<{ group: GroupSummary; members: string[]; swipeInProgress: boolean }>(
       `/api/groups/${groupId}/settings`,
       { token },
     ),

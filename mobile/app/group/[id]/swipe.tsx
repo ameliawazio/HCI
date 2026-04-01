@@ -1,7 +1,7 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
 import {
   ActivityIndicator,
   Alert,
@@ -33,60 +33,53 @@ export default function SwipeScreen() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  // Restart the session every time this screen is focused so that
-  // any group setting changes (price, radius, cuisines) are applied.
   useFocusEffect(
     useCallback(() => {
       if (!normalizedId || normalizedId === 'new') return;
-      startSwipeSession(normalizedId);
-    }, [normalizedId, startSwipeSession]),
-  );
-  useEffect(() => {
-    if (!normalizedId || normalizedId === 'new') return;
-    let mounted = true;
-    const loadRound = async () => {
-      try {
-        setLoading(true);
-        let latitude = 29.6516;
-        let longitude = -82.3248;
+      let mounted = true;
+      const loadRound = async () => {
         try {
-          const Location = await import('expo-location');
-          const { status } = await Location.requestForegroundPermissionsAsync();
-          if (status === 'granted') {
-            // Avoid hanging forever waiting for GPS fix.
-            const loc = await Promise.race([
-              Location.getCurrentPositionAsync({
-                accuracy: Location.Accuracy.Balanced,
-                timeInterval: 1000,
-              }),
-              new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
-            ]);
-            if (loc) {
-              latitude = loc.coords.latitude;
-              longitude = loc.coords.longitude;
-            } else {
-              const last = await Location.getLastKnownPositionAsync();
-              if (last) {
-                latitude = last.coords.latitude;
-                longitude = last.coords.longitude;
+          setLoading(true);
+          let latitude = 29.6516;
+          let longitude = -82.3248;
+          try {
+            const Location = await import('expo-location');
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status === 'granted') {
+              const loc = await Promise.race([
+                Location.getCurrentPositionAsync({
+                  accuracy: Location.Accuracy.Balanced,
+                  timeInterval: 1000,
+                }),
+                new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+              ]);
+              if (loc) {
+                latitude = loc.coords.latitude;
+                longitude = loc.coords.longitude;
+              } else {
+                const last = await Location.getLastKnownPositionAsync();
+                if (last) {
+                  latitude = last.coords.latitude;
+                  longitude = last.coords.longitude;
+                }
               }
             }
+          } catch {
+            // Keep Gainesville fallback when location module/permission is unavailable.
           }
-        } catch {
-          // Keep Gainesville fallback when location module/permission is unavailable.
+          await ensureActiveRound(normalizedId, { latitude, longitude });
+        } catch (err) {
+          Alert.alert('Could not load restaurants', err instanceof Error ? err.message : 'Unknown error');
+        } finally {
+          if (mounted) setLoading(false);
         }
-        await ensureActiveRound(normalizedId, { latitude, longitude });
-      } catch (err) {
-        Alert.alert('Could not load restaurants', err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-    loadRound();
-    return () => {
-      mounted = false;
-    };
-  }, [ensureActiveRound, normalizedId]);
+      };
+      void loadRound();
+      return () => {
+        mounted = false;
+      };
+    }, [ensureActiveRound, normalizedId]),
+  );
 
   useEffect(() => {
     setIndex(0);
@@ -110,10 +103,13 @@ export default function SwipeScreen() {
         } else if (result.status === 'resolved') {
           router.replace(`/group/${normalizedId}/match`);
         } else {
-          router.replace({
-            pathname: `/group/${normalizedId}/waiting`,
-            params: { roundId: String(activeRound.id) },
-          });
+          const rid = activeRound?.id;
+          if (rid != null && normalizedId) {
+            router.replace({
+              pathname: '/group/[id]/waiting',
+              params: { id: normalizedId, roundId: String(rid) },
+            });
+          }
         }
       } catch (err) {
         Alert.alert('Failed to submit votes', err instanceof Error ? err.message : 'Unknown error');
@@ -125,15 +121,30 @@ export default function SwipeScreen() {
     }
   };
 
-  if (!current) {
-    const sessionReady = session.groupId === normalizedId;
-  if (loading || !activeRound || !current) {
+  if (loading || !activeRound) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="large" color={colors.brown} />
           <Text style={styles.loading}>Loading real nearby restaurants…</Text>
         </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!current) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <Text style={styles.headerTitle}>{groupTitle}</Text>
+        <Text style={styles.loading}>
+          No restaurants match your filters.{'\n'}Try adjusting settings.
+        </Text>
+        <Pressable
+          style={styles.settingsLink}
+          onPress={() => router.push(`/group/${normalizedId}/settings`)}
+        >
+          <Text style={styles.settingsLinkText}>Edit Group Settings</Text>
+        </Pressable>
       </SafeAreaView>
     );
   }
@@ -229,28 +240,44 @@ export default function SwipeScreen() {
 }
 
 const styles = StyleSheet.create({
-    moreDetailsBtn: {
-      marginTop: 10,
-      paddingVertical: 6,
-      paddingHorizontal: 18,
-      backgroundColor: '#f3f3f3',
-      borderRadius: 18,
-      alignSelf: 'center',
-      borderWidth: 1,
-      borderColor: '#ddd',
-    },
-    moreDetailsText: {
-      fontSize: 16,
-      color: '#333',
-      textAlign: 'center',
-    },
   safe: { flex: 1, backgroundColor: colors.cream },
-  loading: { textAlign: 'center', marginTop: 40 },
+  loading: {
+    textAlign: 'center',
+    marginTop: 24,
+    fontSize: 16,
+    color: '#555',
+    paddingHorizontal: 32,
+    lineHeight: 24,
+  },
   loadingWrap: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+  },
+  settingsLink: {
+    alignSelf: 'center',
+    marginTop: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    backgroundColor: colors.brown,
+    borderRadius: 20,
+  },
+  settingsLinkText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  moreDetailsBtn: {
+    marginTop: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 18,
+    backgroundColor: '#f3f3f3',
+    borderRadius: 18,
+    alignSelf: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  moreDetailsText: {
+    fontSize: 16,
+    color: '#333',
+    textAlign: 'center',
   },
   headerTitle: {
     fontSize: 20,

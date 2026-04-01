@@ -1,24 +1,42 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import {
+  Alert,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useManeCourse } from '../context/ManeCourseContext';
 import { colors, radii, spacing } from '../constants/theme';
 
 export default function HomeScreen() {
-  const { token, groups, deleteGroup, refreshGroups } = useManeCourse();
+  const { authHydrated, token, groups, deleteGroup, refreshGroups } = useManeCourse();
+  const [refreshing, setRefreshing] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
+      if (!authHydrated) return;
       if (!token) {
         router.replace('/login');
         return;
       }
       refreshGroups().catch(() => null);
-    }, [refreshGroups, token]),
+    }, [authHydrated, refreshGroups, token]),
   );
+
+  const onRefresh = useCallback(() => {
+    if (!token) return;
+    setRefreshing(true);
+    refreshGroups()
+      .catch(() => null)
+      .finally(() => setRefreshing(false));
+  }, [refreshGroups, token]);
 
   const handleDeleteGroup = (groupId: string, groupName: string) => {
     Alert.alert(
@@ -48,7 +66,13 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
-      <View style={styles.list}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.list}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         {groups.map((g) => (
           <View key={g.id} style={styles.card}>
             <Pressable
@@ -80,7 +104,7 @@ export default function HomeScreen() {
             </Pressable>
           </View>
         ))}
-      </View>
+      </ScrollView>
 
       <Pressable
         style={styles.fab}
@@ -121,7 +145,8 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   gear: { fontSize: 22 },
-  list: { padding: spacing.md, gap: spacing.md },
+  scroll: { flex: 1 },
+  list: { padding: spacing.md, gap: spacing.md, paddingBottom: 100 },
   card: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1,5 +1,6 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { api, type AuthUser, type GroupSummary, type RestaurantDeckItem, type RoundSummary } from "../lib/api";
+import { getStoredToken, setStoredToken } from "../lib/authStorage";
 
 export type Group = {
   id: string;
@@ -35,6 +36,8 @@ export type ActiveRound = {
 };
 
 type ManeCourseContextValue = {
+  /** False until AsyncStorage session restore has finished (avoid treating user as logged out during load). */
+  authHydrated: boolean;
   token: string | null;
   groups: Group[];
   currentUser: UserProfile | null;
@@ -58,6 +61,7 @@ type ManeCourseContextValue = {
   getGroupSettings: (groupId: string) => Promise<{
     group: GroupSummary;
     members: string[];
+    swipeInProgress: boolean;
   }>;
   saveGroupSettings: (
     groupId: string,
@@ -85,31 +89,6 @@ type ManeCourseContextValue = {
   }>;
   clearWinner: () => void;
   getRestaurantsByIds: (ids: string[]) => Restaurant[];
-  /** restaurants shown = members × factor (demo) */
-  restaurantsPerMemberFactor: number;
-  session: SessionState;
-  startSwipeSession: (groupId: string) => void;
-  recordSwipe: (restaurantId: string, like: boolean) => void;
-  /** Called when local user finished swiping current deck */
-  finishLocalSwipes: () => void;
-  /** Simulates other members + resolves winner or next round */
-  /** Resolves simulated votes; returns next session (sync). */
-  resolveAfterWaiting: () => SessionState;
-  resetSession: () => void;
-  addMemberToGroup: (groupId: string, username: string) => void;
-  createGroup: (data: { name: string; members: string[]; priceRange?: number; radius?: number; cuisines?: string[] }) => Group;
-  updateGroupSettings?: (groupId: string, updates: { priceRange?: number; radius?: number; cuisines?: string[] }) => void;
-  deleteGroup: (groupId: string) => void;
-};
-
-const defaultSession: SessionState = {
-  groupId: null,
-  deckIds: [],
-  votes: [],
-  round: 1,
-  previousTieIds: null,
-  staleTieMessage: false,
-  winnerId: null,
 };
 
 const ManeCourseContext = createContext<ManeCourseContextValue | null>(null);
@@ -143,6 +122,7 @@ function toRestaurant(item: RestaurantDeckItem): Restaurant {
 }
 
 export function ManeCourseProvider({ children }: { children: React.ReactNode }) {
+  const [authHydrated, setAuthHydrated] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
@@ -169,6 +149,41 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
     setGroups(res.groups.map(toGroup));
   }, [requireToken]);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const t = await getStoredToken();
+        if (cancelled) return;
+        if (t) {
+          try {
+            const user = await api.me(t);
+            if (cancelled) return;
+            setToken(t);
+            setCurrentUser({
+              username: user.username,
+              fullName: user.fullName,
+              email: user.email,
+            });
+            const res = await api.listGroups(t);
+            if (cancelled) return;
+            setGroups(res.groups.map(toGroup));
+          } catch {
+            await setStoredToken(null);
+            setToken(null);
+            setCurrentUser(null);
+            setGroups([]);
+          }
+        }
+      } finally {
+        if (!cancelled) setAuthHydrated(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const hydrateAuth = useCallback((authToken: string, user: AuthUser) => {
     setToken(authToken);
     setCurrentUser({
@@ -184,12 +199,14 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
       try {
         const res = await api.login({ username, password });
         hydrateAuth(res.token, res.user);
-        await refreshGroups();
+        await setStoredToken(res.token);
+        const list = await api.listGroups(res.token);
+        setGroups(list.groups.map(toGroup));
       } finally {
         setLoading(false);
       }
     },
-    [hydrateAuth, refreshGroups],
+    [hydrateAuth],
   );
 
   const signup = useCallback(
@@ -203,15 +220,18 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
       try {
         const res = await api.signup(payload);
         hydrateAuth(res.token, res.user);
-        await refreshGroups();
+        await setStoredToken(res.token);
+        const list = await api.listGroups(res.token);
+        setGroups(list.groups.map(toGroup));
       } finally {
         setLoading(false);
       }
     },
-    [hydrateAuth, refreshGroups],
+    [hydrateAuth],
   );
 
   const logout = useCallback(() => {
+    void setStoredToken(null);
     setToken(null);
     setCurrentUser(null);
     setGroups([]);
@@ -395,6 +415,7 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
 
   const value = useMemo<ManeCourseContextValue>(
     () => ({
+      authHydrated,
       token,
       groups,
       currentUser,
@@ -422,6 +443,7 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
       getRestaurantsByIds,
     }),
     [
+      authHydrated,
       token,
       groups,
       currentUser,
