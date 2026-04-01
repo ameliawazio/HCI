@@ -17,20 +17,20 @@
         </div>
         <h1>ManeCourse</h1>
         <p class="subtitle">Sign in to your account</p>
-        <p>Demo: any email / password will work</p>
+        <p>Demo users: gator1 - gator5 (password: password)</p>
         
       </div>
 
       <!-- Login Form -->
       <form class="form" id="loginForm">
-        <!-- Email Field -->
+        <!-- Username Field -->
         <div class="form-group">
-          <label for="email">Email Address</label>
+          <label for="email">Username</label>
           <input 
-            type="email" 
+            type="text" 
             id="email" 
             name="email" 
-            placeholder="you@example.com" 
+            placeholder="gator1" 
             required
           >
         </div>
@@ -83,14 +83,24 @@
 
   <script>
     // Handle form submission
-    document.getElementById('loginForm').addEventListener('submit', function(e) {
+    document.getElementById('loginForm').addEventListener('submit', async function(e) {
       e.preventDefault();
-      const email = document.getElementById('email').value;
+      const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value;
       const remember = document.getElementById('remember').checked;
-      // Here you would typically send a request to your server
-      // For demo, redirect to home
-      window.location.href = "{{ url_for('home') }}";
+
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: email, password })
+      });
+
+      if (response.ok) {
+        window.location.href = "{{ url_for('home') }}";
+        return;
+      }
+
+      alert('Invalid login.');
     });
 
     // Handle social login

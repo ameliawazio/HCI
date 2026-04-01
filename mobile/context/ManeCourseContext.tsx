@@ -48,7 +48,7 @@ const POOL: Restaurant[] = [
     imageUri:
       'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400',
     menuImageUri: 'https://www.theolivegarden-menu.com/wp-content/uploads/2025/07/theolivegarden-menu-min-scaled.webp',
-    dietaryRestrictions: 'Contains: gluten, dairy, eggs, soy. Vegetarian and gluten-free pasta available. Cross-contact possible. Some vegan options (salad, minestrone).',
+    dietaryRestrictions: 'Contains: gluten, dairy, eggs, soy. Vegetarian and gluten-free pasta available. Cross contamination possible. Some vegan options (salad, minestrone).',
     websiteUrl: 'https://www.olivegarden.com/',
   },
   {
@@ -72,7 +72,7 @@ const POOL: Restaurant[] = [
     imageUri:
       'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400',
     menuImageUri: 'https://www.dragonflyrestaurants.com/wp-content/uploads/2016/09/MD-Menu-2016-Robata.png',
-    dietaryRestrictions: 'Contains: fish, shellfish, soy, gluten. Gluten-free soy sauce available. Vegetarian rolls available. Cross-contact possible.',
+    dietaryRestrictions: 'Contains: fish, shellfish, soy, gluten. Gluten-free soy sauce available. Vegetarian rolls available. Cross contamination possible.',
     websiteUrl: 'https://dragonflyrestaurants.com/',
   },
   {
@@ -84,7 +84,7 @@ const POOL: Restaurant[] = [
     imageUri:
       'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
     menuImageUri: 'https://image.zmenu.com/menupic/4713533/w_20191102001817710815.jpg',
-    dietaryRestrictions: 'Contains: gluten, dairy, eggs, soy. Vegan and vegetarian options available. Gluten-free buns on request. Cross-contact possible.',
+    dietaryRestrictions: 'Contains: gluten, dairy, eggs, soy. Vegan and vegetarian options available. Gluten-free buns on request. Cross contamination possible.',
     websiteUrl: 'https://www.thetophub.com/',
   },
   {
@@ -96,7 +96,7 @@ const POOL: Restaurant[] = [
     imageUri:
       'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400',
     menuImageUri: 'https://images.squarespace-cdn.com/content/v1/58fc1fb7be6594f266d63b72/0edddc0b-852a-4eb5-a1cc-5d5cc4b94039/Satch+Menu+Back.jpg?format=750w',
-    dietaryRestrictions: 'Contains: gluten, dairy, eggs. Vegan cheese and gluten-free crust available. Cross-contact possible. Most pizzas can be made vegetarian.',
+    dietaryRestrictions: 'Contains: gluten, dairy, eggs. Vegan cheese and gluten-free crust available. Cross contamination possible. Most pizzas can be made vegetarian.',
     websiteUrl: 'https://www.satchelspizza.com/',
   },
 ];

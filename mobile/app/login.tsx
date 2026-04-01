@@ -15,9 +15,23 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { colors, radii, spacing } from '../constants/theme';
 
+const VALID_USERS = new Set(['gator1', 'gator2', 'gator3', 'gator4', 'gator5']);
+const VALID_PASSWORD = 'password';
+
 export default function LoginScreen() {
   const [user, setUser] = useState('');
   const [pass, setPass] = useState('');
+  const [error, setError] = useState('');
+
+  function handleLogin() {
+    const username = user.trim().toLowerCase();
+    if (VALID_USERS.has(username) && pass === VALID_PASSWORD) {
+      setError('');
+      router.replace('/home');
+      return;
+    }
+    setError('Invalid login.');
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -86,12 +100,13 @@ export default function LoginScreen() {
             <View style={styles.formBottom}>
               <PrimaryButton
                 title="Login"
-                onPress={() => router.replace('/home')}
+                onPress={handleLogin}
                 style={styles.btn}
               />
 
               <Pressable onPress={() => {}} hitSlop={10}>
-                <Text style={styles.forgot}>Forgot password?</Text>
+                {error ? <Text style={styles.error}>{error}</Text> : null}
+          <Text style={styles.forgot}>Forgot password?</Text>
               </Pressable>
 
               <Text style={styles.footer}>
@@ -253,6 +268,12 @@ const styles = StyleSheet.create({
   btn: {
     marginTop: 0,
     marginBottom: 8,
+  error: {
+    color: colors.white,
+    textAlign: 'center',
+    fontWeight: '700',
+    marginBottom: 16,
+  },
     backgroundColor: colors.brownDark,
     borderWidth: 1,
     borderColor: '#5E4332',
