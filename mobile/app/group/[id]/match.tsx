@@ -3,9 +3,11 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   Alert,
+  Linking,
   Pressable,
   StyleSheet,
   Text,
+  ScrollView,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -45,46 +47,71 @@ export default function MatchScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <Pressable style={styles.backBtn} onPress={() => router.replace('/home')}>
-        <Text style={styles.back}>‹</Text>
-      </Pressable>
-      <Text style={styles.banner}>Stable Connection Found!</Text>
-
-      <View style={styles.heartArea}>
-        <Text style={styles.heartGlow}>♥</Text>
-        <View style={styles.avatars}>
-          <Image
-            source={{
-              uri: 'https://images.unsplash.com/photo-1593789196529-4a366615a65e?w=200',
-            }}
-            style={styles.av}
-          />
-          <Image source={{ uri: winner.imageUri }} style={styles.av} />
-        </View>
-        <Text style={styles.matchLabel}>IT&apos;S A Match!</Text>
-      </View>
-
-      <Text style={styles.restName}>{winner.name}</Text>
-      <Text style={styles.cuisine}>{winner.cuisine}</Text>
-      <Text style={styles.stars}>★★★☆☆</Text>
-      <Pressable onPress={() => setMapOpen(true)}>
-        <Text style={styles.dist}>↗ {winner.miles} miles away</Text>
-      </Pressable>
-      <View style={styles.priceRow}>
-        <Text style={styles.d1}>$</Text>
-        <Text style={styles.d2}>$</Text>
-        <Text style={styles.d2}>$</Text>
-      </View>
-
-      <Pressable
-        style={styles.done}
-        onPress={() => {
-          resetSession();
-          router.replace('/home');
-        }}
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.doneText}>Done</Text>
-      </Pressable>
+        <Pressable style={styles.backBtn} onPress={() => router.replace('/home')}>
+          <Text style={styles.back}>‹</Text>
+        </Pressable>
+        <Text style={styles.banner}>Stable Connection Found!</Text>
+
+        <View style={styles.heartArea}>
+          <Text style={styles.heartGlow}>♥</Text>
+          <View style={styles.avatars}>
+            <Image
+              source={{
+                uri: 'https://images.unsplash.com/photo-1593789196529-4a366615a65e?w=200',
+              }}
+              style={styles.av}
+            />
+            <Image source={{ uri: winner.imageUri }} style={styles.av} />
+          </View>
+          <Text style={styles.matchLabel}>IT&apos;S A MATCH!</Text>
+        </View>
+
+        <View style={styles.winnerInfoCard}>
+          <View style={styles.winnerInfoContent}>
+            <Text style={styles.restName}>{winner.name}</Text>
+            <Text style={styles.cuisine}>{winner.cuisine}</Text>
+
+            <View style={styles.priceRow}>
+              <Text style={styles.d1}>$</Text>
+              <Text style={styles.d2}>$</Text>
+              <Text style={styles.d2}>$</Text>
+            </View>
+
+            <Text style={styles.stars}>★★★☆☆</Text>
+            <Pressable onPress={() => setMapOpen(true)}>
+              <Text style={styles.dist}>↗ {winner.miles} miles away</Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.websiteButton}
+              onPress={async () => {
+                try {
+                  await Linking.openURL(winner.websiteUrl);
+                } catch {
+                  Alert.alert('Unable to open link', 'Please try again in a moment.');
+                }
+              }}
+            >
+              <Text style={styles.websiteLink}>Visit Website</Text>
+            </Pressable>
+          </View>
+        </View>
+    
+        <Pressable
+          style={styles.done}
+          onPress={() => {
+            resetSession();
+            router.replace('/home');
+          }}
+        >
+          <Text style={styles.doneText}>Done</Text>
+        </Pressable>
+      </ScrollView>
 
       <MapModal
         visible={mapOpen}
@@ -103,6 +130,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#B71C1C',
     alignItems: 'center',
     paddingHorizontal: 24,
+  },
+  scroll: { flex: 1, width: '100%' },
+  scrollContent: {
+    alignItems: 'center',
+    paddingBottom: 40,
   },
   miss: { color: '#FFF', marginTop: 40 },
   link: { color: '#FFF', marginTop: 16, textDecorationLine: 'underline' },
@@ -140,16 +172,36 @@ const styles = StyleSheet.create({
     borderColor: '#FFF',
   },
   matchLabel: {
-    marginTop: 100,
+    marginTop: 68,
     fontSize: 28,
     fontWeight: '900',
     color: '#FFF',
+  },
+  winnerInfoCard: {
+    marginTop: 8,
+    width: '100%',
+    maxWidth: 380,
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#FFD5D5',
+    borderRadius: 34,
+    paddingTop: 24,
+    paddingBottom: 18,
+    paddingHorizontal: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  winnerInfoContent: {
+    alignItems: 'center',
+    width: '100%',
   },
   restName: {
     fontSize: 32,
     fontWeight: '800',
     color: '#FFF',
     fontFamily: 'Georgia',
+    textAlign: 'center',
   },
   cuisine: { color: '#FFF', marginTop: 6, fontSize: 16 },
   stars: { color: colors.goldStar, fontSize: 22, marginVertical: 8 },
@@ -162,8 +214,20 @@ const styles = StyleSheet.create({
   priceRow: { flexDirection: 'row', gap: 6, marginTop: 12 },
   d1: { color: '#69F0AE', fontSize: 28, fontWeight: '800' },
   d2: { color: '#FFF', fontSize: 28, fontWeight: '800' },
+  websiteButton: {
+    alignSelf: 'center',
+  },
+  websiteLink: {
+    marginTop: 14,
+    marginBottom: 6,
+    color: '#FFF',
+    textDecorationLine: 'underline',
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
   done: {
-    marginTop: 'auto',
+    marginTop: 18,
     marginBottom: 40,
     paddingVertical: 14,
     paddingHorizontal: 48,

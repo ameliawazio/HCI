@@ -66,7 +66,7 @@ export default function LoginScreen() {
               </View>
               <Text style={styles.appTitle}>ManeCourse</Text>
               <Text style={styles.appSub}>
-                <Text style={styles.appSubRed}>Saddle in</Text> to pick the
+                <Text style={styles.appSubRed}>Saddle up</Text> to pick the
                 perfect spot for any plan.
               </Text>
             </View>
