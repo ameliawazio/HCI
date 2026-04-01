@@ -17,6 +17,8 @@ MAX_DECK_SIZE = 30
 
 app = Flask(__name__)
 
+VALID_USERS = {f"gator{i}": "password" for i in range(1, 6)}
+
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -507,6 +509,17 @@ def resolve_round_if_complete(round_id: int) -> dict[str, Any]:
 @app.get("/")
 def index():
     return render_template("index.html")
+
+
+@app.post("/api/login")
+def login():
+    data = request.get_json(silent=True) or {}
+    username = data.get("username", "")
+    password = data.get("password", "")
+
+    if VALID_USERS.get(username) == password:
+        return jsonify({"success": True, "message": "Login successful"})
+    return jsonify({"success": False, "message": "Invalid username or password"}), 401
 
 
 @app.get("/home")

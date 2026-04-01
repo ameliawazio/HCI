@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import {
   ActivityIndicator,
   Alert,
@@ -32,6 +33,14 @@ export default function SwipeScreen() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
+  // Restart the session every time this screen is focused so that
+  // any group setting changes (price, radius, cuisines) are applied.
+  useFocusEffect(
+    useCallback(() => {
+      if (!normalizedId || normalizedId === 'new') return;
+      startSwipeSession(normalizedId);
+    }, [normalizedId, startSwipeSession]),
+  );
   useEffect(() => {
     if (!normalizedId || normalizedId === 'new') return;
     let mounted = true;
@@ -116,6 +125,8 @@ export default function SwipeScreen() {
     }
   };
 
+  if (!current) {
+    const sessionReady = session.groupId === normalizedId;
   if (loading || !activeRound || !current) {
     return (
       <SafeAreaView style={styles.safe}>

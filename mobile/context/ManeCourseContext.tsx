@@ -85,6 +85,31 @@ type ManeCourseContextValue = {
   }>;
   clearWinner: () => void;
   getRestaurantsByIds: (ids: string[]) => Restaurant[];
+  /** restaurants shown = members × factor (demo) */
+  restaurantsPerMemberFactor: number;
+  session: SessionState;
+  startSwipeSession: (groupId: string) => void;
+  recordSwipe: (restaurantId: string, like: boolean) => void;
+  /** Called when local user finished swiping current deck */
+  finishLocalSwipes: () => void;
+  /** Simulates other members + resolves winner or next round */
+  /** Resolves simulated votes; returns next session (sync). */
+  resolveAfterWaiting: () => SessionState;
+  resetSession: () => void;
+  addMemberToGroup: (groupId: string, username: string) => void;
+  createGroup: (data: { name: string; members: string[]; priceRange?: number; radius?: number; cuisines?: string[] }) => Group;
+  updateGroupSettings?: (groupId: string, updates: { priceRange?: number; radius?: number; cuisines?: string[] }) => void;
+  deleteGroup: (groupId: string) => void;
+};
+
+const defaultSession: SessionState = {
+  groupId: null,
+  deckIds: [],
+  votes: [],
+  round: 1,
+  previousTieIds: null,
+  staleTieMessage: false,
+  winnerId: null,
 };
 
 const ManeCourseContext = createContext<ManeCourseContextValue | null>(null);
