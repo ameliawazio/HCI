@@ -2,6 +2,8 @@ from flask import Flask, jsonify, render_template, request
 
 app = Flask(__name__)
 
+VALID_USERS = {f"gator{i}": "password" for i in range(1, 6)}
+
 
 @app.get("/")
 def index():
@@ -14,10 +16,9 @@ def login():
     username = data.get("username", "")
     password = data.get("password", "")
 
-    # Demo: accept any login for demonstrational flow
-    if username and password:
+    if VALID_USERS.get(username) == password:
         return jsonify({"success": True, "message": "Login successful"})
-    return jsonify({"success": False, "message": "Enter username and password"}), 401
+    return jsonify({"success": False, "message": "Invalid username or password"}), 401
 
 
 @app.get("/home")
