@@ -1,6 +1,7 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   Linking,
@@ -26,6 +27,18 @@ export default function MatchScreen() {
       pollGroupResult(id).catch(() => null);
     }
   }, [id, pollGroupResult, winner]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!id) return () => undefined;
+      const tick = () => {
+        pollGroupResult(id).catch(() => null);
+      };
+      tick();
+      const handle = setInterval(tick, 2500);
+      return () => clearInterval(handle);
+    }, [id, pollGroupResult]),
+  );
 
   useEffect(() => {
     if (staleTieMessage) {
@@ -89,18 +102,22 @@ export default function MatchScreen() {
               <Text style={styles.dist}>↗ {winner.miles} miles away</Text>
             </Pressable>
 
-            <Pressable
-              style={styles.websiteButton}
-              onPress={async () => {
-                try {
-                  await Linking.openURL(winner.websiteUrl);
-                } catch {
-                  Alert.alert('Unable to open link', 'Please try again in a moment.');
-                }
-              }}
-            >
-              <Text style={styles.websiteLink}>Visit Website</Text>
-            </Pressable>
+            {!!winner.placeUrl && (
+              <Pressable
+                style={styles.websiteButton}
+                onPress={async () => {
+                  const url = winner.placeUrl;
+                  if (!url) return;
+                  try {
+                    await Linking.openURL(url);
+                  } catch {
+                    Alert.alert('Unable to open link', 'Please try again in a moment.');
+                  }
+                }}
+              >
+                <Text style={styles.websiteLink}>Visit Website</Text>
+              </Pressable>
+            )}
           </View>
         </View>
     

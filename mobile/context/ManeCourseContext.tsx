@@ -7,6 +7,7 @@ export type Group = {
   name: string;
   memberCount: number;
   imageKey: "roku" | "house";
+  youAreHost?: boolean;
 };
 
 export type Restaurant = {
@@ -44,6 +45,8 @@ type ManeCourseContextValue = {
   groupMembersByGroupId: Record<string, string[]>;
   activeRound: ActiveRound | null;
   roundVotes: Record<string, boolean>;
+  /** Place id → restaurant for the active round deck (and related lookups). */
+  restaurantMap: Record<string, Restaurant>;
   lastWinner: Restaurant | null;
   staleTieMessage: boolean;
   loading: boolean;
@@ -62,6 +65,7 @@ type ManeCourseContextValue = {
     group: GroupSummary;
     members: string[];
     swipeInProgress: boolean;
+    pendingSwipeCount: number;
   }>;
   saveGroupSettings: (
     groupId: string,
@@ -74,12 +78,21 @@ type ManeCourseContextValue = {
     },
   ) => Promise<void>;
   addMemberToGroup: (groupId: string, username: string) => Promise<void>;
+  /** Ends the current swipe round for the whole group (no active round after). */
+  cancelActiveRound: (groupId: string) => Promise<{
+    group: GroupSummary;
+    members: string[];
+    swipeInProgress: boolean;
+    pendingSwipeCount: number;
+  }>;
   ensureActiveRound: (
     groupId: string,
     location: { latitude: number; longitude: number },
-  ) => Promise<ActiveRound>;
+    canStartRound: boolean,
+  ) => Promise<ActiveRound | null>;
   recordSwipe: (placeId: string, liked: boolean) => void;
-  submitAllVotes: () => Promise<void>;
+  /** Merges `includeVotes` on top of current round votes (use for the last card — React state is not updated yet). */
+  submitAllVotes: (includeVotes?: Record<string, boolean>) => Promise<void>;
   completeRound: () => Promise<{
     status: "waiting" | "resolved" | "next_round";
   }>;
@@ -101,6 +114,7 @@ function toGroup(g: GroupSummary): Group {
     name: g.name,
     memberCount: g.memberCount,
     imageKey: "roku",
+    youAreHost: g.youAreHost,
   };
 }
 
@@ -298,6 +312,10 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
       const res = await api.updateGroupSettings(t, Number(groupId), payload);
       const updated = toGroup(res.group);
       setGroups((prev) => prev.map((g) => (g.id === groupId ? updated : g)));
+      setActiveRound((prev) => (prev?.groupId === groupId ? null : prev));
+      setRoundVotes({});
+      setLastWinner(null);
+      setStaleTieMessage(false);
     },
     [requireToken],
   );
@@ -308,6 +326,23 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
       await api.addMember(t, Number(groupId), username);
       await getGroupSettings(groupId);
       await refreshGroups();
+    },
+    [getGroupSettings, refreshGroups, requireToken],
+  );
+
+  const cancelActiveRound = useCallback(
+    async (groupId: string) => {
+      const t = requireToken();
+      const id = Number.parseInt(String(groupId).trim(), 10);
+      if (!Number.isFinite(id) || id < 1) {
+        throw new Error("Invalid group id");
+      }
+      await api.cancelActiveRound(t, id);
+      setActiveRound(null);
+      setRoundVotes({});
+      const res = await getGroupSettings(String(id));
+      await refreshGroups();
+      return res;
     },
     [getGroupSettings, refreshGroups, requireToken],
   );
@@ -332,11 +367,22 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   const ensureActiveRound = useCallback(
-    async (groupId: string, location: { latitude: number; longitude: number }) => {
+    async (
+      groupId: string,
+      location: { latitude: number; longitude: number },
+      canStartRound: boolean,
+    ) => {
       const t = requireToken();
       const active = await api.getActiveRound(t, Number(groupId));
       if (active.round) {
         return captureDeck(groupId, active.round.id, active.round.roundNumber, active.deck);
+      }
+      if (!canStartRound) {
+        setActiveRound(null);
+        setRoundVotes({});
+        setLastWinner(null);
+        setStaleTieMessage(false);
+        return null;
       }
       const started = await api.startRound(t, Number(groupId), location);
       return captureDeck(groupId, started.round.id, started.round.roundNumber, started.deck);
@@ -348,15 +394,19 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
     setRoundVotes((prev) => ({ ...prev, [placeId]: liked }));
   }, []);
 
-  const submitAllVotes = useCallback(async () => {
-    const t = requireToken();
-    if (!activeRound) {
-      throw new Error("No active round");
-    }
-    for (const [placeId, liked] of Object.entries(roundVotes)) {
-      await api.submitVote(t, activeRound.id, { placeId, liked });
-    }
-  }, [activeRound, requireToken, roundVotes]);
+  const submitAllVotes = useCallback(
+    async (includeVotes?: Record<string, boolean>) => {
+      const t = requireToken();
+      if (!activeRound) {
+        throw new Error("No active round");
+      }
+      const allVotes = { ...roundVotes, ...includeVotes };
+      for (const [placeId, liked] of Object.entries(allVotes)) {
+        await api.submitVote(t, activeRound.id, { placeId, liked });
+      }
+    },
+    [activeRound, requireToken, roundVotes],
+  );
 
   const completeRound = useCallback(async () => {
     const t = requireToken();
@@ -378,6 +428,8 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
       const t = requireToken();
       const state = await api.getGroupResult(t, Number(groupId));
       if (state.activeRound) {
+        setLastWinner(null);
+        setStaleTieMessage(false);
         const active = await api.getActiveRound(t, Number(groupId));
         if (active.round) {
           captureDeck(groupId, active.round.id, active.round.roundNumber, active.deck);
@@ -394,6 +446,7 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
               state.winner.photoUrl ||
               "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800",
             address: state.winner.address,
+            placeUrl: state.winner.placeUrl || undefined,
           } as Restaurant)
         : null;
       setLastWinner(winner);
@@ -422,6 +475,7 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
       groupMembersByGroupId,
       activeRound,
       roundVotes,
+      restaurantMap,
       lastWinner,
       staleTieMessage,
       loading,
@@ -434,6 +488,7 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
       getGroupSettings,
       saveGroupSettings,
       addMemberToGroup,
+      cancelActiveRound,
       ensureActiveRound,
       recordSwipe,
       submitAllVotes,
@@ -450,6 +505,7 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
       groupMembersByGroupId,
       activeRound,
       roundVotes,
+      restaurantMap,
       lastWinner,
       staleTieMessage,
       loading,
@@ -462,6 +518,7 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
       getGroupSettings,
       saveGroupSettings,
       addMemberToGroup,
+      cancelActiveRound,
       ensureActiveRound,
       recordSwipe,
       submitAllVotes,

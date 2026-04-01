@@ -18,13 +18,15 @@ import { colors, radii, spacing } from '../../../constants/theme';
 
 const CUISINES = [
   'American',
-  'Asian',
-  'Italian',
-  'Latin',
-  'Mediterranean',
-  'European',
   'Mexican',
+  'Italian',
+  'Chinese',
+  'Japanese',
+  'Thai',
   'Indian',
+  'Mediterranean',
+  'Seafood',
+  'Barbecue',
 ];
 
 export default function GroupSettingsScreen() {
@@ -52,17 +54,16 @@ export default function GroupSettingsScreen() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(normalizedId !== 'new');
   const [trackWidth, setTrackWidth] = useState(1);
-  const [swipeLocked, setSwipeLocked] = useState(false);
+  const [youAreHost, setYouAreHost] = useState(normalizedId === 'new');
 
   const members = groupMembersByGroupId[gid] || MEMBER_USERNAMES.slice(0, 4);
   const priceMax = priceRange;
-  const controlsDisabled = swipeLocked && normalizedId !== 'new';
+  const controlsDisabled = normalizedId !== 'new' && !youAreHost;
 
   useFocusEffect(
     useCallback(() => {
       if (!normalizedId || normalizedId === 'new') {
         setLoading(false);
-        setSwipeLocked(false);
         return;
       }
       let mounted = true;
@@ -75,7 +76,7 @@ export default function GroupSettingsScreen() {
           setPriceRange(res.group.settings.priceMax);
           setPriceMin(res.group.settings.priceMin);
           setSelectedCuisines(new Set(res.group.settings.cuisines));
-          setSwipeLocked(res.swipeInProgress ?? false);
+          setYouAreHost(res.group.youAreHost ?? false);
         })
         .catch((err) => {
           Alert.alert('Failed to load settings', err instanceof Error ? err.message : 'Unknown error');
@@ -134,6 +135,10 @@ export default function GroupSettingsScreen() {
 
   const handleSaveExisting = async () => {
     if (!normalizedId || normalizedId === 'new') return;
+    if (!youAreHost) {
+      Alert.alert('View only', 'Only the group leader can save settings and start the swipe round.');
+      return;
+    }
     try {
       setSaving(true);
       await saveGroupSettings(normalizedId, {
@@ -173,10 +178,10 @@ export default function GroupSettingsScreen() {
         </Pressable>
       </View>
       <ScrollView contentContainerStyle={styles.scroll}>
-        {controlsDisabled && (
-          <View style={styles.lockBanner}>
-            <Text style={styles.lockBannerText}>
-              Someone is still swiping. Settings are locked until everyone finishes this round.
+        {normalizedId !== 'new' && !youAreHost && (
+          <View style={[styles.lockBanner, { borderColor: '#90CAF9', backgroundColor: '#E3F2FD' }]}>
+            <Text style={[styles.lockBannerText, { color: '#1565C0' }]}>
+              View only. Only the group leader can edit settings, add or remove members, or start swiping.
             </Text>
           </View>
         )}
@@ -321,6 +326,14 @@ export default function GroupSettingsScreen() {
           }}
         />
 
+        {normalizedId !== 'new' && (
+          <Pressable
+            style={styles.joinSwipeBtn}
+            onPress={() => router.push(`/group/${normalizedId}/swipe`)}
+          >
+            <Text style={styles.joinSwipeText}>Open swipe screen</Text>
+          </Pressable>
+        )}
         {normalizedId === 'new' ? (
           <Pressable style={styles.createButton} onPress={handleCreateGroup} disabled={saving}>
             <Text style={styles.createButtonText}>{saving ? 'Creating...' : 'Create Group'}</Text>
@@ -331,7 +344,9 @@ export default function GroupSettingsScreen() {
             onPress={handleSaveExisting}
             disabled={saving || controlsDisabled}
           >
-            <Text style={styles.createButtonText}>{saving ? 'Saving...' : 'Save & Start Swiping'}</Text>
+            <Text style={styles.createButtonText}>
+              {saving ? 'Saving...' : youAreHost ? 'Save & Start Swiping' : 'Leader starts swiping'}
+            </Text>
           </Pressable>
         )}
       </ScrollView>
@@ -463,6 +478,19 @@ const styles = StyleSheet.create({
   plus: { fontWeight: '800' },
   minus: { fontWeight: '800', color: '#C00' },
   hint: { fontSize: 12, color: colors.greyText, marginBottom: 8 },
+  joinSwipeBtn: {
+    marginTop: spacing.md,
+    paddingVertical: 12,
+    borderRadius: radii.card,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.brown,
+  },
+  joinSwipeText: {
+    color: colors.brown,
+    fontWeight: '700',
+    fontSize: 15,
+  },
   createButton: {
     marginTop: spacing.lg,
     marginBottom: spacing.lg,

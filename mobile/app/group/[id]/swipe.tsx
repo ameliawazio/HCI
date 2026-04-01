@@ -1,7 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MapModal } from '../../../components/MapModal';
-import { useManeCourse } from '../../../context/ManeCourseContext';
+import { useManeCourse, type Restaurant } from '../../../context/ManeCourseContext';
 import { colors, radii, spacing } from '../../../constants/theme';
 
 export default function SwipeScreen() {
@@ -22,9 +22,10 @@ export default function SwipeScreen() {
     groups,
     activeRound,
     roundVotes,
+    getGroupSettings,
     ensureActiveRound,
     recordSwipe,
-    getRestaurantsByIds,
+    restaurantMap,
     submitAllVotes,
     completeRound,
   } = useManeCourse();
@@ -32,71 +33,98 @@ export default function SwipeScreen() {
   const [mapOpen, setMapOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [waitingForLeader, setWaitingForLeader] = useState(false);
+
+  const loadSwipeRound = useCallback(async () => {
+    if (!normalizedId || normalizedId === 'new') return;
+    try {
+      setLoading(true);
+      setWaitingForLeader(false);
+      let latitude = 29.6516;
+      let longitude = -82.3248;
+      try {
+        const Location = await import('expo-location');
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const loc = await Promise.race([
+            Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+              timeInterval: 1000,
+            }),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+          ]);
+          if (loc) {
+            latitude = loc.coords.latitude;
+            longitude = loc.coords.longitude;
+          } else {
+            const last = await Location.getLastKnownPositionAsync();
+            if (last) {
+              latitude = last.coords.latitude;
+              longitude = last.coords.longitude;
+            }
+          }
+        }
+      } catch {
+        // Keep Gainesville fallback when location module/permission is unavailable.
+      }
+      const { group } = await getGroupSettings(normalizedId);
+      const isHost = group.youAreHost ?? false;
+      const round = await ensureActiveRound(normalizedId, { latitude, longitude }, isHost);
+      if (!round && !isHost) {
+        setWaitingForLeader(true);
+      }
+    } catch (err) {
+      Alert.alert('Could not load restaurants', err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  }, [ensureActiveRound, getGroupSettings, normalizedId]);
 
   useFocusEffect(
     useCallback(() => {
       if (!normalizedId || normalizedId === 'new') return;
-      let mounted = true;
-      const loadRound = async () => {
-        try {
-          setLoading(true);
-          let latitude = 29.6516;
-          let longitude = -82.3248;
-          try {
-            const Location = await import('expo-location');
-            const { status } = await Location.requestForegroundPermissionsAsync();
-            if (status === 'granted') {
-              const loc = await Promise.race([
-                Location.getCurrentPositionAsync({
-                  accuracy: Location.Accuracy.Balanced,
-                  timeInterval: 1000,
-                }),
-                new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
-              ]);
-              if (loc) {
-                latitude = loc.coords.latitude;
-                longitude = loc.coords.longitude;
-              } else {
-                const last = await Location.getLastKnownPositionAsync();
-                if (last) {
-                  latitude = last.coords.latitude;
-                  longitude = last.coords.longitude;
-                }
-              }
-            }
-          } catch {
-            // Keep Gainesville fallback when location module/permission is unavailable.
-          }
-          await ensureActiveRound(normalizedId, { latitude, longitude });
-        } catch (err) {
-          Alert.alert('Could not load restaurants', err instanceof Error ? err.message : 'Unknown error');
-        } finally {
-          if (mounted) setLoading(false);
-        }
-      };
-      void loadRound();
-      return () => {
-        mounted = false;
-      };
-    }, [ensureActiveRound, normalizedId]),
+      void loadSwipeRound();
+    }, [loadSwipeRound, normalizedId]),
   );
 
   useEffect(() => {
     setIndex(0);
   }, [activeRound?.id, activeRound?.deck.length]);
 
-  const deck = getRestaurantsByIds(activeRound?.deck.map((d) => d.placeId) || []);
-  const current = deck[index];
+  const deckLen = activeRound?.deck.length ?? 0;
+  const deckItem = activeRound?.deck[index];
+  const current = useMemo((): Restaurant | undefined => {
+    if (!deckItem) return undefined;
+    const fromMap = restaurantMap[deckItem.placeId];
+    if (fromMap) return fromMap;
+    return {
+      id: deckItem.placeId,
+      name: deckItem.name,
+      cuisine: deckItem.cuisine || 'Restaurant',
+      priceLevel: (deckItem.priceLevel || 1) as 1 | 2 | 3 | 4,
+      miles: deckItem.distanceMiles,
+      imageUri:
+        deckItem.photoUrl ||
+        'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800',
+      address: deckItem.address,
+      latitude: deckItem.latitude,
+      longitude: deckItem.longitude,
+      placeUrl: deckItem.placeUrl,
+    };
+  }, [deckItem, restaurantMap]);
   const groupTitle =
     groups.find((g) => g.id === normalizedId)?.name ?? 'Group';
+  const youAreHost =
+    groups.find((g) => g.id === normalizedId)?.youAreHost ?? false;
 
   const onChoice = async (like: boolean) => {
     if (!current) return;
     recordSwipe(current.id, like);
-    if (index >= deck.length - 1) {
+    if (index >= deckLen - 1) {
       try {
         setSubmitting(true);
-        await submitAllVotes();
+        // Last choice is not in `roundVotes` yet (setState is async); merge it in for submission.
+        await submitAllVotes({ [current.id]: like });
         const result = await completeRound();
         if (result.status === 'next_round') {
           router.replace(`/group/${normalizedId}/swipe`);
@@ -121,13 +149,53 @@ export default function SwipeScreen() {
     }
   };
 
-  if (loading || !activeRound) {
+  if (loading) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="large" color={colors.brown} />
           <Text style={styles.loading}>Loading real nearby restaurants…</Text>
         </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (waitingForLeader && !activeRound) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <Text style={styles.headerTitle}>{groupTitle}</Text>
+        <View style={styles.loadingWrap}>
+          <Text style={styles.loading}>
+            Waiting for the group leader to start the swipe round from Group Settings (Save and start
+            swiping).
+          </Text>
+          <Pressable style={styles.settingsLink} onPress={() => void loadSwipeRound()}>
+            <Text style={styles.settingsLinkText}>Check again</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.settingsLink, { marginTop: 12, backgroundColor: '#888' }]}
+            onPress={() => router.push(`/group/${normalizedId}/settings`)}
+          >
+            <Text style={styles.settingsLinkText}>Open group settings</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!activeRound) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <Text style={styles.headerTitle}>{groupTitle}</Text>
+        <Text style={styles.loading}>
+          No swipe round is active. The group leader can start one from Group Settings.
+        </Text>
+        <Pressable
+          style={styles.settingsLink}
+          onPress={() => router.push(`/group/${normalizedId}/settings`)}
+        >
+          <Text style={styles.settingsLinkText}>Group settings</Text>
+        </Pressable>
       </SafeAreaView>
     );
   }
@@ -211,22 +279,31 @@ export default function SwipeScreen() {
         </View>
       </View>
 
-      <View style={styles.tabBar}>
+      {youAreHost ? (
+        <View style={styles.tabBar}>
+          <Pressable
+            style={styles.tabItem}
+            onPress={() => router.replace('/home')}
+          >
+            <Text style={styles.tabIcon}>👥</Text>
+            <Text style={styles.tabLabel}>My Groups</Text>
+          </Pressable>
+          <Pressable
+            style={styles.tabItem}
+            onPress={() => router.push(`/group/${normalizedId}/settings`)}
+          >
+            <Text style={styles.tabIcon}>✎</Text>
+            <Text style={styles.tabLabel}>Group Settings</Text>
+          </Pressable>
+        </View>
+      ) : (
         <Pressable
-          style={styles.tabItem}
-          onPress={() => router.replace('/home')}
+          style={styles.swipeOnlyBar}
+          onPress={() => router.replace(`/group/${normalizedId}/swipe`)}
         >
-          <Text style={styles.tabIcon}>👥</Text>
-          <Text style={styles.tabLabel}>My Groups</Text>
+          <Text style={styles.swipeOnlyBarText}>Open swipe screen</Text>
         </Pressable>
-        <Pressable
-          style={styles.tabItem}
-          onPress={() => router.push(`/group/${normalizedId}/settings`)}
-        >
-          <Text style={styles.tabIcon}>✎</Text>
-          <Text style={styles.tabLabel}>Group Settings</Text>
-        </Pressable>
-      </View>
+      )}
 
       <MapModal
         visible={mapOpen}
@@ -349,6 +426,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#EDE8E0',
     borderTopWidth: 1,
     borderTopColor: '#DDD',
+  },
+  swipeOnlyBar: {
+    paddingVertical: 14,
+    backgroundColor: colors.brown,
+    borderTopWidth: 1,
+    borderTopColor: '#DDD',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  swipeOnlyBarText: {
+    color: colors.cream,
+    fontWeight: '800',
+    fontSize: 15,
+    fontFamily: 'Georgia',
   },
   tabItem: { alignItems: 'center' },
   tabIcon: { fontSize: 22 },

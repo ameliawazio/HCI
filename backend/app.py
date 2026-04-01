@@ -219,15 +219,16 @@ def ensure_group_member(group_id: int) -> sqlite3.Row | None:
     ).fetchone()
 
 
-def group_to_json(row: sqlite3.Row) -> dict[str, Any]:
+def group_to_json(row: sqlite3.Row, viewer_id: int | None = None) -> dict[str, Any]:
     db = get_db()
     member_count = db.execute(
         "SELECT COUNT(*) AS c FROM group_members WHERE group_id = ?", (row["id"],)
     ).fetchone()["c"]
-    return {
+    out: dict[str, Any] = {
         "id": row["id"],
         "name": row["name"],
         "memberCount": member_count,
+        "hostUserId": row["host_user_id"],
         "settings": {
             "radiusMiles": row["radius_miles"],
             "priceMin": row["price_min"],
@@ -235,6 +236,9 @@ def group_to_json(row: sqlite3.Row) -> dict[str, Any]:
             "cuisines": json.loads(row["cuisines_json"] or "[]"),
         },
     }
+    if viewer_id is not None:
+        out["youAreHost"] = int(row["host_user_id"]) == int(viewer_id)
+    return out
 
 
 def get_active_round(group_id: int) -> sqlite3.Row | None:
@@ -263,12 +267,31 @@ def abort_active_rounds_for_group(group_id: int) -> None:
     db.commit()
 
 
-def swipe_in_progress(group_id: int) -> bool:
-    """True if an active round exists and at least one member has not finished swiping."""
+def active_round_pending_swipes(group_id: int) -> tuple[bool, int]:
+    """(settings_locked, how many members still owe a completed swipe for this active round)."""
     active = get_active_round(group_id)
     if not active:
-        return False
+        return False, 0
     db = get_db()
+    group_member_n = int(
+        db.execute(
+            "SELECT COUNT(*) AS c FROM group_members WHERE group_id = ?",
+            (group_id,),
+        ).fetchone()["c"]
+        or 0
+    )
+    participant_n = int(
+        db.execute(
+            "SELECT COUNT(*) AS c FROM round_participants WHERE round_id = ?",
+            (active["id"],),
+        ).fetchone()["c"]
+        or 0
+    )
+    stored_mc = int(active["member_count"] or 0)
+    # Stale round (e.g. member added after round was created, or DB drift): do not lock settings on bad data.
+    if group_member_n != participant_n or stored_mc != group_member_n:
+        abort_active_rounds_for_group(group_id)
+        return False, 0
     n = db.execute(
         """
         SELECT COUNT(*) AS c
@@ -277,7 +300,8 @@ def swipe_in_progress(group_id: int) -> bool:
         """,
         (active["id"],),
     ).fetchone()["c"]
-    return int(n or 0) > 0
+    c = int(n or 0)
+    return (c > 0, c)
 
 
 def group_settings_version(group_row: sqlite3.Row) -> int:
@@ -400,7 +424,7 @@ def search_nearby_places(
     results: list[dict[str, Any]] = []
     pagetoken: str | None = None
 
-    for _ in range(4):
+    for _ in range(8):
         params = dict(base_params)
         if pagetoken:
             params["pagetoken"] = pagetoken
@@ -428,6 +452,43 @@ def search_nearby_places(
 
     results.sort(key=lambda x: (x["distanceMiles"], x["placeId"]))
     return results
+
+
+def collect_places_for_deck(
+    latitude: float,
+    longitude: float,
+    attempt_configs: list[dict[str, Any]],
+    wanted_count: int,
+) -> tuple[list[dict[str, Any]], str, list[str]]:
+    """Merge unique places across relaxed search configs until we have enough for the deck."""
+    by_id: dict[str, dict[str, Any]] = {}
+    attempt_errors: list[str] = []
+    chosen_reason = "none"
+    for cfg in attempt_configs:
+        if len(by_id) >= wanted_count:
+            break
+        try:
+            need_more = max(0, wanted_count - len(by_id))
+            batch = search_nearby_places(
+                latitude,
+                longitude,
+                float(cfg["radius_miles"]),
+                int(cfg["price_min"]),
+                int(cfg["price_max"]),
+                list(cfg["cuisines"]),
+                min_results=max(need_more * 3, wanted_count, 15),
+            )
+            for p in batch:
+                pid = p.get("placeId")
+                if pid and pid not in by_id:
+                    by_id[pid] = p
+            if len(by_id) >= wanted_count:
+                chosen_reason = str(cfg["reason"])
+                break
+        except Exception as exc:  # noqa: BLE001
+            attempt_errors.append(f'{cfg["reason"]}: {exc}')
+    ordered = sorted(by_id.values(), key=lambda x: (x["distanceMiles"], x["placeId"]))
+    return ordered[:wanted_count], chosen_reason, attempt_errors
 
 
 def create_round(
@@ -522,10 +583,12 @@ def resolve_round_if_complete(round_id: int) -> dict[str, Any]:
 
     vote_rows = db.execute(
         """
-        SELECT place_id, SUM(CASE WHEN liked = 1 THEN 1 ELSE 0 END) AS likes
-        FROM votes
-        WHERE round_id = ?
-        GROUP BY place_id
+        SELECT v.place_id, SUM(CASE WHEN v.liked = 1 THEN 1 ELSE 0 END) AS likes
+        FROM votes v
+        INNER JOIN round_restaurants rr
+            ON rr.round_id = v.round_id AND rr.place_id = v.place_id
+        WHERE v.round_id = ?
+        GROUP BY v.place_id
         """,
         (round_id,),
     ).fetchall()
@@ -719,7 +782,9 @@ def list_groups():
         """,
         (g.current_user["id"],),
     ).fetchall()
-    return jsonify({"groups": [group_to_json(r) for r in rows]})
+    return jsonify(
+        {"groups": [group_to_json(r, g.current_user["id"]) for r in rows]}
+    )
 
 
 @app.post("/api/groups")
@@ -748,7 +813,7 @@ def create_group():
     )
     db.commit()
     row = db.execute("SELECT * FROM groups WHERE id = ?", (group_id,)).fetchone()
-    return jsonify({"group": group_to_json(row)}), 201
+    return jsonify({"group": group_to_json(row, g.current_user["id"])}), 201
 
 
 @app.delete("/api/groups/<int:group_id>")
@@ -782,11 +847,13 @@ def get_group_settings(group_id: int):
         """,
         (group_id,),
     ).fetchall()
+    locked, pending = active_round_pending_swipes(group_id)
     return jsonify(
         {
-            "group": group_to_json(group),
+            "group": group_to_json(group, g.current_user["id"]),
             "members": [m["username"] for m in members],
-            "swipeInProgress": swipe_in_progress(group_id),
+            "swipeInProgress": locked,
+            "pendingSwipeCount": pending,
         }
     )
 
@@ -797,13 +864,8 @@ def update_group_settings(group_id: int):
     group = ensure_group_member(group_id)
     if not group:
         return jsonify({"error": "Group not found"}), 404
-    if swipe_in_progress(group_id):
-        return jsonify(
-            {
-                "error": "Cannot change settings while someone is still swiping. "
-                "Wait until everyone finishes or the round completes.",
-            }
-        ), 409
+    if int(group["host_user_id"]) != int(g.current_user["id"]):
+        return jsonify({"error": "Only the group leader can edit group settings."}), 403
     data = request.get_json(silent=True) or {}
     name = (data.get("name") or group["name"]).strip()
     radius = float(data.get("radiusMiles") or group["radius_miles"])
@@ -829,7 +891,7 @@ def update_group_settings(group_id: int):
     db.commit()
     abort_active_rounds_for_group(group_id)
     updated = db.execute("SELECT * FROM groups WHERE id = ?", (group_id,)).fetchone()
-    return jsonify({"group": group_to_json(updated)})
+    return jsonify({"group": group_to_json(updated, g.current_user["id"])})
 
 
 @app.post("/api/groups/<int:group_id>/members")
@@ -838,6 +900,8 @@ def add_group_member(group_id: int):
     group = ensure_group_member(group_id)
     if not group:
         return jsonify({"error": "Group not found"}), 404
+    if int(group["host_user_id"]) != int(g.current_user["id"]):
+        return jsonify({"error": "Only the group leader can add members."}), 403
     data = request.get_json(silent=True) or {}
     username = (data.get("username") or "").strip()
     if not username:
@@ -859,6 +923,19 @@ def add_group_member(group_id: int):
     except sqlite3.IntegrityError:
         return jsonify({"error": "User is already in the group"}), 409
 
+    abort_active_rounds_for_group(group_id)
+    return jsonify({"ok": True})
+
+
+@app.post("/api/groups/<int:group_id>/rounds/cancel")
+@auth_required
+def cancel_group_round(group_id: int):
+    """Discard the active swipe round for everyone (e.g. stuck state or group wants to reset)."""
+    group = ensure_group_member(group_id)
+    if not group:
+        return jsonify({"error": "Group not found"}), 404
+    if int(group["host_user_id"]) != int(g.current_user["id"]):
+        return jsonify({"error": "Only the group leader can discard the swipe round."}), 403
     abort_active_rounds_for_group(group_id)
     return jsonify({"ok": True})
 
@@ -906,6 +983,11 @@ def start_round(group_id: int):
             )
     abort_active_rounds_for_group(group_id)
 
+    if int(group["host_user_id"]) != int(g.current_user["id"]):
+        return jsonify(
+            {"error": "Only the group leader can start a swipe round (fetch the restaurant deck)."}
+        ), 403
+
     data = request.get_json(silent=True) or {}
     latitude = float(data.get("latitude") or 29.6516)
     longitude = float(data.get("longitude") or -82.3248)
@@ -951,48 +1033,42 @@ def start_round(group_id: int):
         },
     ]
 
-    places: list[dict[str, Any]] = []
-    attempt_errors: list[str] = []
-    chosen_reason = "none"
-    for cfg in attempt_configs:
-        try:
-            candidates = search_nearby_places(
-                latitude,
-                longitude,
-                cfg["radius_miles"],
-                cfg["price_min"],
-                cfg["price_max"],
-                cfg["cuisines"],
-                min_results=wanted_count,
-            )
-            if candidates:
-                places = candidates
-                chosen_reason = cfg["reason"]
-                break
-        except Exception as exc:  # noqa: BLE001 - surface API issue to client
-            attempt_errors.append(f'{cfg["reason"]}: {exc}')
+    selected, chosen_reason, attempt_errors = collect_places_for_deck(
+        latitude, longitude, attempt_configs, wanted_count
+    )
 
-    if not places:
-        if attempt_errors:
+    if len(selected) < wanted_count:
+        if not selected:
+            if attempt_errors:
+                return (
+                    jsonify(
+                        {
+                            "error": "Failed to fetch nearby places",
+                            "details": attempt_errors,
+                        }
+                    ),
+                    502,
+                )
             return (
                 jsonify(
                     {
-                        "error": "Failed to fetch nearby places",
-                        "details": attempt_errors,
+                        "error": "No restaurants matched current settings",
+                        "hint": "Try larger radius or broader price/cuisine filters",
                     }
                 ),
-                502,
+                400,
             )
         return (
             jsonify(
                 {
-                    "error": "No restaurants matched current settings",
-                    "hint": "Try larger radius or broader price/cuisine filters",
+                    "error": "Not enough unique restaurants nearby for this group size.",
+                    "found": len(selected),
+                    "wanted": wanted_count,
+                    "details": attempt_errors or None,
                 }
             ),
             400,
         )
-    selected = places[:wanted_count]
     round_row = create_round(group_id, latitude, longitude, selected)
     return jsonify(
         {
@@ -1084,6 +1160,15 @@ def get_group_result(group_id: int):
     if not group:
         return jsonify({"error": "Group not found"}), 404
     db = get_db()
+    active = get_active_round(group_id)
+    payload: dict[str, Any] = {"activeRound": None, "winner": None}
+    if active:
+        payload["activeRound"] = {"id": active["id"], "roundNumber": active["round_number"]}
+        # No match winner while a round is still active (swiping or tie-breaker). Avoids showing the
+        # previous round's restaurant after a new session has started.
+        return jsonify(payload)
+    group_row = db.execute("SELECT * FROM groups WHERE id = ?", (group_id,)).fetchone()
+    current_sv = group_settings_version(group_row) if group_row else 1
     resolved = db.execute(
         """
         SELECT *
@@ -1094,10 +1179,9 @@ def get_group_result(group_id: int):
         """,
         (group_id,),
     ).fetchone()
-    active = get_active_round(group_id)
-    payload: dict[str, Any] = {"activeRound": None, "winner": None}
-    if active:
-        payload["activeRound"] = {"id": active["id"], "roundNumber": active["round_number"]}
+    if resolved and int(resolved["settings_version"] or 0) != int(current_sv):
+        # Leader saved new settings after this round; don't surface an old match for the new session.
+        resolved = None
     if resolved:
         winner = db.execute(
             """
@@ -1117,6 +1201,7 @@ def get_group_result(group_id: int):
                 "photoUrl": winner["photo_url"],
                 "cuisine": winner["cuisine"],
                 "priceLevel": winner["price_level"],
+                "placeUrl": winner["place_url"],
                 "staleTie": bool(resolved["stale_tie"]),
             }
     return jsonify(payload)

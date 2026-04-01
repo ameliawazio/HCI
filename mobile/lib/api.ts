@@ -16,6 +16,8 @@ export type GroupSummary = {
   id: number;
   name: string;
   memberCount: number;
+  hostUserId?: number;
+  youAreHost?: boolean;
   settings: GroupSettings;
 };
 
@@ -60,9 +62,9 @@ async function apiRequest<T>(path: string, options: RequestOptions = {}): Promis
     headers,
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
-  const data = await res.json().catch(() => ({}));
+  const data = (await res.json().catch(() => ({}))) as { error?: string };
   if (!res.ok) {
-    throw new Error((data && data.error) || "Request failed");
+    throw new Error(data.error || `HTTP ${res.status}`);
   }
   return data as T;
 }
@@ -99,10 +101,12 @@ export const api = {
       token,
     }),
   getGroupSettings: (token: string, groupId: number) =>
-    apiRequest<{ group: GroupSummary; members: string[]; swipeInProgress: boolean }>(
-      `/api/groups/${groupId}/settings`,
-      { token },
-    ),
+    apiRequest<{
+      group: GroupSummary;
+      members: string[];
+      swipeInProgress: boolean;
+      pendingSwipeCount: number;
+    }>(`/api/groups/${groupId}/settings`, { token }),
   updateGroupSettings: (
     token: string,
     groupId: number,
@@ -118,6 +122,12 @@ export const api = {
       method: "POST",
       token,
       body: { username },
+    }),
+  cancelActiveRound: (token: string, groupId: number) =>
+    apiRequest<{ ok: boolean }>(`/api/groups/${groupId}/rounds/cancel`, {
+      method: "POST",
+      token,
+      body: {},
     }),
   startRound: (
     token: string,
@@ -170,6 +180,7 @@ export const api = {
         photoUrl?: string;
         cuisine?: string;
         priceLevel?: number;
+        placeUrl?: string | null;
         staleTie?: boolean;
       } | null;
     }>(`/api/groups/${groupId}/result`, { token }),

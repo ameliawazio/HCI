@@ -50,7 +50,7 @@ export default function WaitingScreen() {
       <View style={styles.dim}>
         <View style={styles.modal}>
           <Text style={styles.waitText}>
-            Waiting for other group members to finish…
+            Waiting for group mates to complete swiping.
           </Text>
         </View>
       </View>

@@ -96,12 +96,14 @@ export default function HomeScreen() {
                 <Text style={styles.cardSub}>{g.memberCount} members</Text>
               </View>
             </Pressable>
-            <Pressable
-              style={styles.deleteHitArea}
-              onPress={() => handleDeleteGroup(g.id, g.name)}
-            >
-              <View style={styles.deleteLine} />
-            </Pressable>
+            {g.youAreHost && (
+              <Pressable
+                style={styles.deleteHitArea}
+                onPress={() => handleDeleteGroup(g.id, g.name)}
+              >
+                <View style={styles.deleteLine} />
+              </Pressable>
+            )}
           </View>
         ))}
       </ScrollView>
