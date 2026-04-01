@@ -1,115 +1,24 @@
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  useState,
-} from 'react';
-import {
-  findTopRestaurantIds,
-  sameTieSet,
-  type Vote,
-} from '../lib/voting';
+import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { api, type AuthUser, type GroupSummary, type RestaurantDeckItem, type RoundSummary } from "../lib/api";
 
 export type Group = {
   id: string;
   name: string;
   memberCount: number;
-  imageKey: 'roku' | 'house';
+  imageKey: "roku" | "house";
 };
 
 export type Restaurant = {
   id: string;
   name: string;
   cuisine: string;
-  priceLevel: 1 | 2 | 3;
+  priceLevel: 1 | 2 | 3 | 4;
   miles: number;
   imageUri: string;
-  menuImageUri: string;
-  dietaryRestrictions: string;
-  websiteUrl: string;
-};
-
-const MOCK_GROUPS: Group[] = [
-  { id: '1', name: 'The Roku Remotes', memberCount: 4, imageKey: 'roku' },
-  { id: '2', name: 'Family', memberCount: 6, imageKey: 'house' },
-];
-
-const POOL: Restaurant[] = [
-  {
-    id: 'r1',
-    name: 'Olive Garden',
-    cuisine: 'Italian Cuisine',
-    priceLevel: 3,
-    miles: 0.2,
-    imageUri:
-      'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400',
-    menuImageUri: 'https://www.theolivegarden-menu.com/wp-content/uploads/2025/07/theolivegarden-menu-min-scaled.webp',
-    dietaryRestrictions: 'Contains: gluten, dairy, eggs, soy. Vegetarian and gluten-free pasta available. Cross-contact possible. Some vegan options (salad, minestrone).',
-    websiteUrl: 'https://www.olivegarden.com/',
-  },
-  {
-    id: 'r2',
-    name: "Raising Cane's",
-    cuisine: 'American Cuisine',
-    priceLevel: 3,
-    miles: 0.4,
-    imageUri:
-      'https://images.unsplash.com/photo-1561758033-d89a9ad46330?w=400',
-    menuImageUri: 'https://b.zmtcdn.com/data/menus/848/16887848/76d9f19907f05248c485cbecb2087c2d.jpg',
-    dietaryRestrictions: 'Contains: gluten, dairy, eggs. Most items fried in shared oil. Limited vegetarian options. No certified vegan or gluten-free kitchen.',
-    websiteUrl: 'https://www.raisingcanes.com/',
-  },
-  {
-    id: 'r3',
-    name: 'Dragonfly',
-    cuisine: 'Sushi',
-    priceLevel: 2,
-    miles: 0.6,
-    imageUri:
-      'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400',
-    menuImageUri: 'https://www.dragonflyrestaurants.com/wp-content/uploads/2016/09/MD-Menu-2016-Robata.png',
-    dietaryRestrictions: 'Contains: fish, shellfish, soy, gluten. Gluten-free soy sauce available. Vegetarian rolls available. Cross-contact possible.',
-    websiteUrl: 'https://dragonflyrestaurants.com/',
-  },
-  {
-    id: 'r4',
-    name: 'The Top',
-    cuisine: 'American Cuisine',
-    priceLevel: 2,
-    miles: 0.3,
-    imageUri:
-      'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
-    menuImageUri: 'https://image.zmenu.com/menupic/4713533/w_20191102001817710815.jpg',
-    dietaryRestrictions: 'Contains: gluten, dairy, eggs, soy. Vegan and vegetarian options available. Gluten-free buns on request. Cross-contact possible.',
-    websiteUrl: 'https://www.thetophub.com/',
-  },
-  {
-    id: 'r5',
-    name: 'Satchel’s Pizza',
-    cuisine: 'Pizza',
-    priceLevel: 2,
-    miles: 0.5,
-    imageUri:
-      'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400',
-    menuImageUri: 'https://images.squarespace-cdn.com/content/v1/58fc1fb7be6594f266d63b72/0edddc0b-852a-4eb5-a1cc-5d5cc4b94039/Satch+Menu+Back.jpg?format=750w',
-    dietaryRestrictions: 'Contains: gluten, dairy, eggs. Vegan cheese and gluten-free crust available. Cross-contact possible. Most pizzas can be made vegetarian.',
-    websiteUrl: 'https://www.satchelspizza.com/',
-  },
-];
-
-const MEMBER_USERNAMES = ['Bogi', 'Olivia', 'Lucas', 'Zach', 'Amelia'];
-
-export type SessionState = {
-  groupId: string | null;
-  /** Deck for current swipe round */
-  deckIds: string[];
-  votes: Vote[];
-  round: number;
-  /** Sorted tie set from previous round (to detect repeat tie) */
-  previousTieIds: string[] | null;
-  staleTieMessage: boolean;
-  winnerId: string | null;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  placeUrl?: string;
 };
 
 export type UserProfile = {
@@ -118,257 +27,411 @@ export type UserProfile = {
   email: string;
 };
 
-type ManeCourseContextValue = {
-  groups: Group[];
-  currentUser: UserProfile;
-  updateCurrentUser: (updates: Partial<UserProfile>) => void;
-  groupMembersByGroupId: Record<string, string[]>;
-  getRestaurantsByIds: (ids: string[]) => Restaurant[];
-  /** restaurants shown = members × factor (demo) */
-  restaurantsPerMemberFactor: number;
-  session: SessionState;
-  startSwipeSession: (groupId: string) => void;
-  recordSwipe: (restaurantId: string, like: boolean) => void;
-  /** Called when local user finished swiping current deck */
-  finishLocalSwipes: () => void;
-  /** Simulates other members + resolves winner or next round */
-  /** Resolves simulated votes; returns next session (sync). */
-  resolveAfterWaiting: () => SessionState;
-  resetSession: () => void;
-  addMemberToGroup: (groupId: string, username: string) => void;
-  createGroup: (data: { name: string; members: string[] }) => Group;
-  deleteGroup: (groupId: string) => void;
+export type ActiveRound = {
+  id: number;
+  groupId: string;
+  roundNumber: number;
+  deck: RestaurantDeckItem[];
 };
 
-const defaultSession: SessionState = {
-  groupId: null,
-  deckIds: [],
-  votes: [],
-  round: 1,
-  previousTieIds: null,
-  staleTieMessage: false,
-  winnerId: null,
+type ManeCourseContextValue = {
+  token: string | null;
+  groups: Group[];
+  currentUser: UserProfile | null;
+  groupMembersByGroupId: Record<string, string[]>;
+  activeRound: ActiveRound | null;
+  roundVotes: Record<string, boolean>;
+  lastWinner: Restaurant | null;
+  staleTieMessage: boolean;
+  loading: boolean;
+  login: (username: string, password: string) => Promise<void>;
+  signup: (payload: {
+    username: string;
+    fullName: string;
+    email: string;
+    password: string;
+  }) => Promise<void>;
+  logout: () => void;
+  refreshGroups: () => Promise<void>;
+  createGroup: (data: { name: string; members: string[] }) => Promise<Group>;
+  deleteGroup: (groupId: string) => Promise<void>;
+  getGroupSettings: (groupId: string) => Promise<{
+    group: GroupSummary;
+    members: string[];
+  }>;
+  saveGroupSettings: (
+    groupId: string,
+    payload: {
+      name: string;
+      radiusMiles: number;
+      priceMin: number;
+      priceMax: number;
+      cuisines: string[];
+    },
+  ) => Promise<void>;
+  addMemberToGroup: (groupId: string, username: string) => Promise<void>;
+  ensureActiveRound: (
+    groupId: string,
+    location: { latitude: number; longitude: number },
+  ) => Promise<ActiveRound>;
+  recordSwipe: (placeId: string, liked: boolean) => void;
+  submitAllVotes: () => Promise<void>;
+  completeRound: () => Promise<{
+    status: "waiting" | "resolved" | "next_round";
+  }>;
+  pollGroupResult: (groupId: string) => Promise<{
+    activeRound: RoundSummary | null;
+    winner: Restaurant | null;
+  }>;
+  clearWinner: () => void;
+  getRestaurantsByIds: (ids: string[]) => Restaurant[];
 };
 
 const ManeCourseContext = createContext<ManeCourseContextValue | null>(null);
 
-function buildDeckForGroup(groupId: string, factor: number, groups: Group[]): string[] {
-  const g = groups.find((x) => x.id === groupId);
-  const n = g ? Math.max(1, g.memberCount * factor) : 5;
-  const out: string[] = [];
-  for (let i = 0; i < n; i++) {
-    out.push(POOL[i % POOL.length].id);
-  }
-  return out;
-}
+export const MEMBER_USERNAMES = ["Bogi", "Olivia", "Lucas", "Zach", "Amelia"];
 
-function randomLike(): boolean {
-  return Math.random() > 0.35;
-}
-
-function computeSessionAfterWaiting(prev: SessionState): SessionState {
-  if (!prev.groupId) return prev;
-  const g = MOCK_GROUPS.find((x) => x.id === prev.groupId);
-  const memberCount = g?.memberCount ?? 4;
-  const simCount = Math.max(0, memberCount - 1);
-  const simIds = Array.from({ length: simCount }, (_, i) => `sim${i}`);
-
-  const votes: Vote[] = [...prev.votes];
-  for (const rid of prev.deckIds) {
-    for (const uid of simIds) {
-      if (votes.some((v) => v.userId === uid && v.restaurantId === rid)) {
-        continue;
-      }
-      votes.push({
-        restaurantId: rid,
-        userId: uid,
-        like: randomLike(),
-      });
-    }
-  }
-
-  const topIds = findTopRestaurantIds(prev.deckIds, votes);
-  if (topIds.length === 0) {
-    return { ...prev, votes, winnerId: prev.deckIds[0] ?? null };
-  }
-  if (topIds.length === 1) {
-    return { ...prev, votes, winnerId: topIds[0]! };
-  }
-
-  const tieSorted = [...topIds].sort();
-  const staleTie =
-    prev.previousTieIds !== null &&
-    sameTieSet(prev.previousTieIds, tieSorted) &&
-    prev.round >= 2;
-
-  if (staleTie) {
-    return {
-      ...prev,
-      votes,
-      winnerId: topIds[0]!,
-      staleTieMessage: true,
-    };
-  }
-
+function toGroup(g: GroupSummary): Group {
   return {
-    ...prev,
-    votes: [],
-    deckIds: topIds,
-    round: prev.round + 1,
-    previousTieIds: tieSorted,
-    staleTieMessage: false,
-    winnerId: null,
+    id: String(g.id),
+    name: g.name,
+    memberCount: g.memberCount,
+    imageKey: "roku",
+  };
+}
+
+function toRestaurant(item: RestaurantDeckItem): Restaurant {
+  return {
+    id: item.placeId,
+    name: item.name,
+    cuisine: item.cuisine || "Restaurant",
+    priceLevel: ((item.priceLevel || 1) as 1 | 2 | 3 | 4),
+    miles: item.distanceMiles,
+    imageUri:
+      item.photoUrl ||
+      "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800",
+    address: item.address,
+    latitude: item.latitude,
+    longitude: item.longitude,
+    placeUrl: item.placeUrl,
   };
 }
 
 export function ManeCourseProvider({ children }: { children: React.ReactNode }) {
-  const [groupsList, setGroupsList] = useState<Group[]>(MOCK_GROUPS);
-  const [extraMembers, setExtraMembers] = useState<Record<string, string[]>>(
-    {},
-  );
-  const [session, setSession] = useState<SessionState>(defaultSession);
-  const [currentUser, setCurrentUser] = useState<UserProfile>({
-    username: 'Jdoe121',
-    fullName: 'John Doe',
-    email: 'Jdoe121@gmail.com',
-  });
+  const [token, setToken] = useState<string | null>(null);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [groupMembersByGroupId, setGroupMembersByGroupId] = useState<
+    Record<string, string[]>
+  >({});
+  const [activeRound, setActiveRound] = useState<ActiveRound | null>(null);
+  const [roundVotes, setRoundVotes] = useState<Record<string, boolean>>({});
+  const [restaurantMap, setRestaurantMap] = useState<Record<string, Restaurant>>({});
+  const [lastWinner, setLastWinner] = useState<Restaurant | null>(null);
+  const [staleTieMessage, setStaleTieMessage] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const groups = useMemo(() => groupsList, [groupsList]);
-
-  const groupMembersByGroupId = useMemo(() => {
-    const base: Record<string, string[]> = {
-      '1': ['Bogi', 'Olivia', 'Lucas', 'Zach'],
-      '2': ['Mom', 'Dad', 'Alex', 'Sam', 'Jamie', 'River'],
-      new: [],
-    };
-    const merged = { ...base };
-    for (const [gid, list] of Object.entries(extraMembers)) {
-      merged[gid] = [...(merged[gid] || []), ...list];
+  const requireToken = useCallback(() => {
+    if (!token) {
+      throw new Error("Not logged in");
     }
-    return merged;
-  }, [extraMembers]);
+    return token;
+  }, [token]);
 
-  const getRestaurantsByIds = useCallback((ids: string[]) => {
-    const map = new Map(POOL.map((r) => [r.id, r]));
-    return ids.map((id) => map.get(id)!).filter(Boolean);
+  const refreshGroups = useCallback(async () => {
+    const t = requireToken();
+    const res = await api.listGroups(t);
+    setGroups(res.groups.map(toGroup));
+  }, [requireToken]);
+
+  const hydrateAuth = useCallback((authToken: string, user: AuthUser) => {
+    setToken(authToken);
+    setCurrentUser({
+      username: user.username,
+      fullName: user.fullName,
+      email: user.email,
+    });
   }, []);
 
-  const restaurantsPerMemberFactor = 3;
+  const login = useCallback(
+    async (username: string, password: string) => {
+      setLoading(true);
+      try {
+        const res = await api.login({ username, password });
+        hydrateAuth(res.token, res.user);
+        await refreshGroups();
+      } finally {
+        setLoading(false);
+      }
+    },
+    [hydrateAuth, refreshGroups],
+  );
 
-  const startSwipeSession = useCallback((groupId: string) => {
-    const deckIds = buildDeckForGroup(groupId, restaurantsPerMemberFactor, groupsList);
-    setSession({
-      ...defaultSession,
-      groupId,
-      deckIds,
-      round: 1,
-    });
-  }, [groupsList, restaurantsPerMemberFactor]);
+  const signup = useCallback(
+    async (payload: {
+      username: string;
+      fullName: string;
+      email: string;
+      password: string;
+    }) => {
+      setLoading(true);
+      try {
+        const res = await api.signup(payload);
+        hydrateAuth(res.token, res.user);
+        await refreshGroups();
+      } finally {
+        setLoading(false);
+      }
+    },
+    [hydrateAuth, refreshGroups],
+  );
 
-  const recordSwipe = useCallback((restaurantId: string, like: boolean) => {
-    setSession((prev) => {
-      const me = 'me';
-      const without = prev.votes.filter(
-        (v) => !(v.userId === me && v.restaurantId === restaurantId),
-      );
-      return {
+  const logout = useCallback(() => {
+    setToken(null);
+    setCurrentUser(null);
+    setGroups([]);
+    setGroupMembersByGroupId({});
+    setActiveRound(null);
+    setRoundVotes({});
+    setRestaurantMap({});
+    setLastWinner(null);
+    setStaleTieMessage(false);
+  }, []);
+
+  const createGroup = useCallback(
+    async (data: { name: string; members: string[] }) => {
+      const t = requireToken();
+      const res = await api.createGroup(t, data.name);
+      const created = toGroup(res.group);
+      setGroups((prev) => [created, ...prev]);
+
+      for (const username of data.members) {
+        if (username.trim()) {
+          await api.addMember(t, res.group.id, username.trim());
+        }
+      }
+      await refreshGroups();
+      return created;
+    },
+    [refreshGroups, requireToken],
+  );
+
+  const deleteGroup = useCallback(
+    async (groupId: string) => {
+      const t = requireToken();
+      await api.deleteGroup(t, Number(groupId));
+      setGroups((prev) => prev.filter((g) => g.id !== groupId));
+    },
+    [requireToken],
+  );
+
+  const getGroupSettings = useCallback(
+    async (groupId: string) => {
+      const t = requireToken();
+      const res = await api.getGroupSettings(t, Number(groupId));
+      setGroupMembersByGroupId((prev) => ({
         ...prev,
-        votes: [...without, { restaurantId, userId: me, like }],
-      };
-    });
-  }, []);
-
-  const finishLocalSwipes = useCallback(() => {
-    // votes from "me" are already recorded; waiting screen will simulate others
-  }, []);
-
-  const resolveAfterWaiting = useCallback(() => {
-    let next!: SessionState;
-    setSession((prev) => {
-      next = computeSessionAfterWaiting(prev);
-      return next;
-    });
-    return next;
-  }, []);
-
-  const resetSession = useCallback(() => {
-    setSession(defaultSession);
-  }, []);
-
-  const addMemberToGroup = useCallback((groupId: string, username: string) => {
-    const u = username.trim();
-    if (!u) return;
-    setExtraMembers((m) => ({
-      ...m,
-      [groupId]: [...(m[groupId] || []), u],
-    }));
-  }, []);
-
-  const updateCurrentUser = useCallback((updates: Partial<UserProfile>) => {
-    setCurrentUser((prev) => ({
-      ...prev,
-      ...updates,
-    }));
-  }, []);
-
-  const createGroup = useCallback((data: { name: string; members: string[] }) => {
-    const newId = `${Date.now()}`;
-    const newGroup: Group = {
-      id: newId,
-      name: data.name,
-      memberCount: data.members.length,
-      imageKey: 'roku', // default image
-    };
-    setGroupsList((prev) => [...prev, newGroup]);
-    // Add members to the group
-    if (data.members.length > 0) {
-      setExtraMembers((m) => ({
-        ...m,
-        [newId]: data.members,
+        [groupId]: res.members,
       }));
-    }
-    return newGroup;
-  }, []);
-
-  const deleteGroup = useCallback((groupId: string) => {
-    setGroupsList((prev) => prev.filter((g) => g.id !== groupId));
-    setExtraMembers((prev) => {
-      const next = { ...prev };
-      delete next[groupId];
-      return next;
-    });
-    setSession((prev) => (prev.groupId === groupId ? defaultSession : prev));
-  }, []);
-
-  const value: ManeCourseContextValue = {
-    groups,
-    currentUser,
-    updateCurrentUser,
-    groupMembersByGroupId,
-    getRestaurantsByIds,
-    restaurantsPerMemberFactor,
-    session,
-    startSwipeSession,
-    recordSwipe,
-    finishLocalSwipes,
-    resolveAfterWaiting,
-    resetSession,
-    addMemberToGroup,
-    createGroup,
-    deleteGroup,
-  };
-
-  return (
-    <ManeCourseContext.Provider value={value}>{children}</ManeCourseContext.Provider>
+      return res;
+    },
+    [requireToken],
   );
+
+  const saveGroupSettings = useCallback(
+    async (
+      groupId: string,
+      payload: {
+        name: string;
+        radiusMiles: number;
+        priceMin: number;
+        priceMax: number;
+        cuisines: string[];
+      },
+    ) => {
+      const t = requireToken();
+      const res = await api.updateGroupSettings(t, Number(groupId), payload);
+      const updated = toGroup(res.group);
+      setGroups((prev) => prev.map((g) => (g.id === groupId ? updated : g)));
+    },
+    [requireToken],
+  );
+
+  const addMemberToGroup = useCallback(
+    async (groupId: string, username: string) => {
+      const t = requireToken();
+      await api.addMember(t, Number(groupId), username);
+      await getGroupSettings(groupId);
+      await refreshGroups();
+    },
+    [getGroupSettings, refreshGroups, requireToken],
+  );
+
+  const captureDeck = useCallback((groupId: string, roundId: number, roundNumber: number, deck: RestaurantDeckItem[]) => {
+    const m: Record<string, Restaurant> = {};
+    for (const item of deck) {
+      m[item.placeId] = toRestaurant(item);
+    }
+    setRestaurantMap((prev) => ({ ...prev, ...m }));
+    const round: ActiveRound = {
+      id: roundId,
+      groupId,
+      roundNumber,
+      deck,
+    };
+    setActiveRound(round);
+    setRoundVotes({});
+    setLastWinner(null);
+    setStaleTieMessage(false);
+    return round;
+  }, []);
+
+  const ensureActiveRound = useCallback(
+    async (groupId: string, location: { latitude: number; longitude: number }) => {
+      const t = requireToken();
+      const active = await api.getActiveRound(t, Number(groupId));
+      if (active.round) {
+        return captureDeck(groupId, active.round.id, active.round.roundNumber, active.deck);
+      }
+      const started = await api.startRound(t, Number(groupId), location);
+      return captureDeck(groupId, started.round.id, started.round.roundNumber, started.deck);
+    },
+    [captureDeck, requireToken],
+  );
+
+  const recordSwipe = useCallback((placeId: string, liked: boolean) => {
+    setRoundVotes((prev) => ({ ...prev, [placeId]: liked }));
+  }, []);
+
+  const submitAllVotes = useCallback(async () => {
+    const t = requireToken();
+    if (!activeRound) {
+      throw new Error("No active round");
+    }
+    for (const [placeId, liked] of Object.entries(roundVotes)) {
+      await api.submitVote(t, activeRound.id, { placeId, liked });
+    }
+  }, [activeRound, requireToken, roundVotes]);
+
+  const completeRound = useCallback(async () => {
+    const t = requireToken();
+    if (!activeRound) {
+      throw new Error("No active round");
+    }
+    const result = await api.completeRound(t, activeRound.id);
+    if (result.status === "next_round") {
+      const next = await api.getActiveRound(t, Number(activeRound.groupId));
+      if (next.round) {
+        captureDeck(activeRound.groupId, next.round.id, next.round.roundNumber, next.deck);
+      }
+    }
+    return { status: result.status };
+  }, [activeRound, captureDeck, requireToken]);
+
+  const pollGroupResult = useCallback(
+    async (groupId: string) => {
+      const t = requireToken();
+      const state = await api.getGroupResult(t, Number(groupId));
+      if (state.activeRound) {
+        const active = await api.getActiveRound(t, Number(groupId));
+        if (active.round) {
+          captureDeck(groupId, active.round.id, active.round.roundNumber, active.deck);
+        }
+      }
+      const winner = state.winner
+        ? ({
+            id: state.winner.placeId,
+            name: state.winner.name,
+            cuisine: state.winner.cuisine || "Restaurant",
+            priceLevel: (state.winner.priceLevel || 1) as 1 | 2 | 3 | 4,
+            miles: state.winner.distanceMiles,
+            imageUri:
+              state.winner.photoUrl ||
+              "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800",
+            address: state.winner.address,
+          } as Restaurant)
+        : null;
+      setLastWinner(winner);
+      setStaleTieMessage(Boolean(state.winner?.staleTie));
+      return { activeRound: state.activeRound, winner };
+    },
+    [captureDeck, requireToken],
+  );
+
+  const clearWinner = useCallback(() => {
+    setLastWinner(null);
+    setStaleTieMessage(false);
+  }, []);
+
+  const getRestaurantsByIds = useCallback(
+    (ids: string[]) => ids.map((id) => restaurantMap[id]).filter(Boolean),
+    [restaurantMap],
+  );
+
+  const value = useMemo<ManeCourseContextValue>(
+    () => ({
+      token,
+      groups,
+      currentUser,
+      groupMembersByGroupId,
+      activeRound,
+      roundVotes,
+      lastWinner,
+      staleTieMessage,
+      loading,
+      login,
+      signup,
+      logout,
+      refreshGroups,
+      createGroup,
+      deleteGroup,
+      getGroupSettings,
+      saveGroupSettings,
+      addMemberToGroup,
+      ensureActiveRound,
+      recordSwipe,
+      submitAllVotes,
+      completeRound,
+      pollGroupResult,
+      clearWinner,
+      getRestaurantsByIds,
+    }),
+    [
+      token,
+      groups,
+      currentUser,
+      groupMembersByGroupId,
+      activeRound,
+      roundVotes,
+      lastWinner,
+      staleTieMessage,
+      loading,
+      login,
+      signup,
+      logout,
+      refreshGroups,
+      createGroup,
+      deleteGroup,
+      getGroupSettings,
+      saveGroupSettings,
+      addMemberToGroup,
+      ensureActiveRound,
+      recordSwipe,
+      submitAllVotes,
+      completeRound,
+      pollGroupResult,
+      clearWinner,
+      getRestaurantsByIds,
+    ],
+  );
+
+  return <ManeCourseContext.Provider value={value}>{children}</ManeCourseContext.Provider>;
 }
 
 export function useManeCourse() {
   const ctx = useContext(ManeCourseContext);
   if (!ctx) {
-    throw new Error('useManeCourse must be used within ManeCourseProvider');
+    throw new Error("useManeCourse must be used within ManeCourseProvider");
   }
   return ctx;
 }
-
-export { MOCK_GROUPS, MEMBER_USERNAMES, POOL };

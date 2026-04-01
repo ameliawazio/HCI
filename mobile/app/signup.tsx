@@ -13,12 +13,30 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { colors, radii, spacing } from '../constants/theme';
+import { useManeCourse } from '../context/ManeCourseContext';
 
 export default function SignUpScreen() {
+  const { signup, loading } = useManeCourse();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [user, setUser] = useState('');
   const [pass, setPass] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSignup = async () => {
+    try {
+      setError('');
+      await signup({
+        username: user.trim(),
+        fullName: fullName.trim(),
+        email: email.trim(),
+        password: pass,
+      });
+      router.replace('/home');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Sign up failed');
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -94,9 +112,11 @@ export default function SignUpScreen() {
             <View style={styles.formBottom}>
               <PrimaryButton
                 title="Create Account"
-                onPress={() => router.replace('/home')}
+                onPress={handleSignup}
                 style={styles.btn}
               />
+              {!!error && <Text style={styles.errorText}>{error}</Text>}
+              {loading && <Text style={styles.loadingText}>Creating account...</Text>}
 
               <Text style={styles.footer}>
                 Already have an account?{' '}
@@ -213,5 +233,16 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textDecorationLine: 'underline',
     color: colors.brown,
+  },
+  errorText: {
+    color: '#7A1313',
+    textAlign: 'center',
+    marginTop: 8,
+    fontWeight: '700',
+  },
+  loadingText: {
+    color: colors.brownDark,
+    textAlign: 'center',
+    marginTop: 8,
   },
 });

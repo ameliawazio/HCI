@@ -2,6 +2,8 @@ import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -17,49 +19,115 @@ export default function SwipeScreen() {
   const normalizedId = Array.isArray(id) ? id[0] : id;
   const {
     groups,
-    session,
-    startSwipeSession,
+    activeRound,
+    roundVotes,
+    ensureActiveRound,
     recordSwipe,
     getRestaurantsByIds,
+    submitAllVotes,
+    completeRound,
   } = useManeCourse();
   const [index, setIndex] = useState(0);
   const [mapOpen, setMapOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!normalizedId || normalizedId === 'new') return;
-    if (session.groupId !== normalizedId) {
-      startSwipeSession(normalizedId);
-    }
-  }, [normalizedId, session.groupId, startSwipeSession]);
+    let mounted = true;
+    const loadRound = async () => {
+      try {
+        setLoading(true);
+        let latitude = 29.6516;
+        let longitude = -82.3248;
+        try {
+          const Location = await import('expo-location');
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status === 'granted') {
+            // Avoid hanging forever waiting for GPS fix.
+            const loc = await Promise.race([
+              Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.Balanced,
+                timeInterval: 1000,
+              }),
+              new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+            ]);
+            if (loc) {
+              latitude = loc.coords.latitude;
+              longitude = loc.coords.longitude;
+            } else {
+              const last = await Location.getLastKnownPositionAsync();
+              if (last) {
+                latitude = last.coords.latitude;
+                longitude = last.coords.longitude;
+              }
+            }
+          }
+        } catch {
+          // Keep Gainesville fallback when location module/permission is unavailable.
+        }
+        await ensureActiveRound(normalizedId, { latitude, longitude });
+      } catch (err) {
+        Alert.alert('Could not load restaurants', err instanceof Error ? err.message : 'Unknown error');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    loadRound();
+    return () => {
+      mounted = false;
+    };
+  }, [ensureActiveRound, normalizedId]);
 
   useEffect(() => {
     setIndex(0);
-  }, [session.deckIds.join(',')]);
+  }, [activeRound?.id, activeRound?.deck.length]);
 
-  const deck = getRestaurantsByIds(session.deckIds);
+  const deck = getRestaurantsByIds(activeRound?.deck.map((d) => d.placeId) || []);
   const current = deck[index];
   const groupTitle =
     groups.find((g) => g.id === normalizedId)?.name ?? 'Group';
 
-  const onChoice = (like: boolean) => {
+  const onChoice = async (like: boolean) => {
     if (!current) return;
     recordSwipe(current.id, like);
     if (index >= deck.length - 1) {
-      router.push(`/group/${normalizedId}/waiting`);
+      try {
+        setSubmitting(true);
+        await submitAllVotes();
+        const result = await completeRound();
+        if (result.status === 'next_round') {
+          router.replace(`/group/${normalizedId}/swipe`);
+        } else if (result.status === 'resolved') {
+          router.replace(`/group/${normalizedId}/match`);
+        } else {
+          router.replace({
+            pathname: `/group/${normalizedId}/waiting`,
+            params: { roundId: String(activeRound.id) },
+          });
+        }
+      } catch (err) {
+        Alert.alert('Failed to submit votes', err instanceof Error ? err.message : 'Unknown error');
+      } finally {
+        setSubmitting(false);
+      }
     } else {
       setIndex((i) => i + 1);
     }
   };
 
-  if (!current) {
+  if (loading || !activeRound || !current) {
     return (
       <SafeAreaView style={styles.safe}>
-        <Text style={styles.loading}>Loading deck…</Text>
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color={colors.brown} />
+          <Text style={styles.loading}>Loading real nearby restaurants…</Text>
+        </View>
       </SafeAreaView>
     );
   }
 
-  const filled = Math.min(current.priceLevel, 3);
+  const filled = Math.min(current.priceLevel, 4);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -74,7 +142,7 @@ export default function SwipeScreen() {
           <Text style={styles.distance}>↗ {current.miles} miles away</Text>
         </Pressable>
         <View style={styles.priceRow}>
-          {[1, 2, 3].map((i) => (
+          {[1, 2, 3, 4].map((i) => (
             <Text
               key={i}
               style={[
@@ -88,20 +156,33 @@ export default function SwipeScreen() {
         </View>
         <Pressable
           style={styles.moreDetailsBtn}
-          onPress={() => router.push({ pathname: '/RestaurantDetails', params: { restaurantId: current.id } })}
+          onPress={() =>
+            router.push({
+              pathname: '/RestaurantDetails',
+              params: { restaurantId: current.id },
+            })
+          }
         >
           <Text style={styles.moreDetailsText}>More Details <Text style={{ fontWeight: 'bold' }}>+</Text></Text>
         </Pressable>
+        {!!roundVotes[current.id] && (
+          <Text style={styles.selectedHint}>Selected: Like</Text>
+        )}
+        {roundVotes[current.id] === false && (
+          <Text style={styles.selectedHint}>Selected: Pass</Text>
+        )}
         <View style={styles.actions}>
           <Pressable
             style={[styles.circle, styles.no]}
-            onPress={() => onChoice(false)}
+            onPress={() => void onChoice(false)}
+            disabled={submitting}
           >
             <Text style={styles.arrow}>←</Text>
           </Pressable>
           <Pressable
             style={[styles.circle, styles.yes]}
-            onPress={() => onChoice(true)}
+            onPress={() => void onChoice(true)}
+            disabled={submitting}
           >
             <Text style={styles.arrow}>→</Text>
           </Pressable>
@@ -130,7 +211,7 @@ export default function SwipeScreen() {
         onClose={() => setMapOpen(false)}
         restaurantName={current.name}
         miles={current.miles}
-        address="1680 W University Ave, Ste 20"
+        address={current.address || 'Address unavailable'}
       />
     </SafeAreaView>
   );
@@ -154,6 +235,12 @@ const styles = StyleSheet.create({
     },
   safe: { flex: 1, backgroundColor: colors.cream },
   loading: { textAlign: 'center', marginTop: 40 },
+  loadingWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
   headerTitle: {
     fontSize: 20,
     fontWeight: '800',
@@ -200,6 +287,7 @@ const styles = StyleSheet.create({
   dollar: { fontSize: 22, fontWeight: '800' },
   dollarOn: { color: '#2E7D32' },
   dollarOff: { color: '#111' },
+  selectedHint: { marginTop: 8, color: colors.greyText },
   actions: {
     flexDirection: 'row',
     gap: 40,

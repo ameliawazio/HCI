@@ -1,18 +1,14 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet, Linking, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import { useRoute } from '@react-navigation/native';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useManeCourse } from '../context/ManeCourseContext';
 
 // Props: expects a restaurantId passed via navigation params
 export default function RestaurantDetails() {
-  // You may need to adjust this if using expo-router or another router
-  const route = useRoute();
-  // @ts-ignore
-  const { restaurantId } = route.params || {};
+  const { restaurantId } = useLocalSearchParams<{ restaurantId: string }>();
   const { getRestaurantsByIds } = useManeCourse();
-  const restaurant = getRestaurantsByIds([restaurantId])[0];
+  const restaurant = restaurantId ? getRestaurantsByIds([restaurantId])[0] : undefined;
 
   if (!restaurant) {
     return (
@@ -36,25 +32,29 @@ export default function RestaurantDetails() {
       </View>
       <View style={styles.container}>
         <Text style={styles.name}>{restaurant.name}</Text>
-        {restaurant.menuImageUri && (
+        {restaurant.imageUri && (
           <Image
-            source={{ uri: restaurant.menuImageUri }}
+            source={{ uri: restaurant.imageUri }}
             style={styles.menuImg}
             resizeMode="contain"
           />
         )}
-        {restaurant.websiteUrl && (
+        {restaurant.placeUrl && (
           <Pressable
             style={styles.websiteBtn}
-            onPress={() => Linking.openURL(restaurant.websiteUrl)}
+            onPress={() => Linking.openURL(restaurant.placeUrl!)}
           >
-            <Text style={styles.websiteText}>Visit Website</Text>
+            <Text style={styles.websiteText}>Open in Maps</Text>
           </Pressable>
         )}
-        {restaurant.dietaryRestrictions && (
+        <View style={styles.dietaryBox}>
+          <Text style={styles.dietaryTitle}>Cuisine:</Text>
+          <Text style={styles.dietaryText}>{restaurant.cuisine}</Text>
+        </View>
+        {!!restaurant.address && (
           <View style={styles.dietaryBox}>
-            <Text style={styles.dietaryTitle}>Dietary Restrictions:</Text>
-            <Text style={styles.dietaryText}>{restaurant.dietaryRestrictions}</Text>
+            <Text style={styles.dietaryTitle}>Address:</Text>
+            <Text style={styles.dietaryText}>{restaurant.address}</Text>
           </View>
         )}
       </View>

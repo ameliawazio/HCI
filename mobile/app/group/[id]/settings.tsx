@@ -1,7 +1,9 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -23,23 +25,59 @@ const CUISINES = [
 
 export default function GroupSettingsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { groupMembersByGroupId, createGroup } = useManeCourse();
+  const {
+    groupMembersByGroupId,
+    createGroup,
+    getGroupSettings,
+    saveGroupSettings,
+    addMemberToGroup,
+  } = useManeCourse();
   const normalizedId = Array.isArray(id) ? id[0] : id;
   const gid = normalizedId === 'new' ? 'new' : (normalizedId ?? '1');
-  const [groupName, setGroupName] = useState(
-    normalizedId === 'new' ? 'New group' : 'The Roku Remotes',
-  );
+  const [groupName, setGroupName] = useState(normalizedId === 'new' ? 'New group' : '');
   const [addUser, setAddUser] = useState('');
-  const [radius, setRadius] = useState(0.3);
+  const [radius, setRadius] = useState(5);
   const [priceRange, setPriceRange] = useState(2);
+  const [priceMin, setPriceMin] = useState(1);
   const [selectedCuisines, setSelectedCuisines] = useState<Set<string>>(
     new Set(),
   );
   const [newMembers, setNewMembers] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(normalizedId !== 'new');
+  const [trackWidth, setTrackWidth] = useState(1);
 
-  const members =
-    groupMembersByGroupId[gid] ||
-    MEMBER_USERNAMES.slice(0, 4);
+  const members = groupMembersByGroupId[gid] || MEMBER_USERNAMES.slice(0, 4);
+  const priceMax = priceRange;
+
+  useEffect(() => {
+    if (!normalizedId || normalizedId === 'new') return;
+    let mounted = true;
+    setLoading(true);
+    getGroupSettings(normalizedId)
+      .then((res) => {
+        if (!mounted) return;
+        setGroupName(res.group.name);
+        setRadius(res.group.settings.radiusMiles);
+        setPriceRange(res.group.settings.priceMax);
+        setPriceMin(res.group.settings.priceMin);
+        setSelectedCuisines(new Set(res.group.settings.cuisines));
+      })
+      .catch((err) => {
+        Alert.alert('Failed to load settings', err instanceof Error ? err.message : 'Unknown error');
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [getGroupSettings, normalizedId]);
+
+  const radiusPercent = useMemo(
+    () => Math.max(0, Math.min(1, (radius - 1) / 19)),
+    [radius],
+  );
 
   const handleToggleCuisine = (cuisine: string) => {
     setSelectedCuisines((prev) => {
@@ -58,13 +96,56 @@ export default function GroupSettingsScreen() {
       alert('Please enter a group name');
       return;
     }
-    const allMembers = [...members, ...newMembers];
-    const newGroup = createGroup({
-      name: groupName,
-      members: allMembers,
-    });
-    router.replace(`/group/${newGroup.id}/swipe`);
+    setSaving(true);
+    createGroup({
+      name: groupName.trim(),
+      members: newMembers,
+    })
+      .then(async (newGroup) => {
+        await saveGroupSettings(newGroup.id, {
+          name: groupName.trim(),
+          radiusMiles: radius,
+          priceMin,
+          priceMax,
+          cuisines: [...selectedCuisines],
+        });
+        router.replace(`/group/${newGroup.id}/swipe`);
+      })
+      .catch((err) => {
+        Alert.alert('Failed to create group', err instanceof Error ? err.message : 'Unknown error');
+      })
+      .finally(() => setSaving(false));
   };
+
+  const handleSaveExisting = async () => {
+    if (!normalizedId || normalizedId === 'new') return;
+    try {
+      setSaving(true);
+      await saveGroupSettings(normalizedId, {
+        name: groupName.trim(),
+        radiusMiles: radius,
+        priceMin,
+        priceMax,
+        cuisines: [...selectedCuisines],
+      });
+      router.replace(`/group/${normalizedId}/swipe`);
+    } catch (err) {
+      Alert.alert('Failed to save settings', err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color={colors.brown} />
+          <Text style={styles.hintText}>Loading group settings...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -116,19 +197,38 @@ export default function GroupSettingsScreen() {
         </View>
 
         <Text style={styles.label}>Radius</Text>
-        <View style={styles.sliderRow}>
-          <View style={[styles.track, { flex: 1 }]}>
-            <View
-              style={[styles.thumb, { left: `${radius * 100}%` }]}
-            />
-          </View>
+        <View style={styles.radiusControls}>
+          <Pressable
+            style={styles.radiusButton}
+            onPress={() => setRadius((r) => Math.max(1, r - 1))}
+          >
+            <Text style={styles.radiusButtonText}>-</Text>
+          </Pressable>
+          <Text style={styles.radiusValue}>{radius} mi</Text>
+          <Pressable
+            style={styles.radiusButton}
+            onPress={() => setRadius((r) => Math.min(20, r + 1))}
+          >
+            <Text style={styles.radiusButtonText}>+</Text>
+          </Pressable>
         </View>
-        <Pressable
-          onPress={() => setRadius((r) => (r > 0.1 ? r - 0.1 : r))}
-          style={styles.sliderHint}
-        >
-          <Text style={styles.hintText}>Tap track to adjust (demo)</Text>
-        </Pressable>
+        <View style={styles.sliderRow}>
+          <Pressable
+            style={[styles.track, { flex: 1 }]}
+            onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width || 1)}
+            onPressIn={(e) => {
+              const x = e.nativeEvent.locationX;
+              const pct = Math.max(0, Math.min(1, x / trackWidth));
+              const nextRadius = 1 + pct * 19;
+              setRadius(Math.round(nextRadius));
+            }}
+          >
+            <View
+              style={[styles.thumb, { left: `${radiusPercent * 100}%` }]}
+            />
+          </Pressable>
+        </View>
+        <Text style={styles.hintText}>{radius} miles</Text>
 
         <Text style={styles.label}>Cuisine Types</Text>
         <View style={styles.chips}>
@@ -176,15 +276,28 @@ export default function GroupSettingsScreen() {
           onChangeText={setAddUser}
           onSubmitEditing={() => {
             if (addUser.trim()) {
-              setNewMembers([...newMembers, addUser.trim()]);
-              setAddUser('');
+              if (normalizedId === 'new') {
+                setNewMembers([...newMembers, addUser.trim()]);
+                setAddUser('');
+                return;
+              }
+              addMemberToGroup(gid, addUser.trim())
+                .then(() => setAddUser(''))
+                .catch((err) => {
+                  Alert.alert('Could not add member', err instanceof Error ? err.message : 'Unknown error');
+                });
             }
           }}
         />
 
         {normalizedId === 'new' && (
-          <Pressable style={styles.createButton} onPress={handleCreateGroup}>
-            <Text style={styles.createButtonText}>Create Group</Text>
+          <Pressable style={styles.createButton} onPress={handleCreateGroup} disabled={saving}>
+            <Text style={styles.createButtonText}>{saving ? 'Creating...' : 'Create Group'}</Text>
+          </Pressable>
+        )}
+        {normalizedId !== 'new' && (
+          <Pressable style={styles.createButton} onPress={handleSaveExisting} disabled={saving}>
+            <Text style={styles.createButtonText}>{saving ? 'Saving...' : 'Save & Start Swiping'}</Text>
           </Pressable>
         )}
       </ScrollView>
@@ -241,6 +354,33 @@ const styles = StyleSheet.create({
   priceButtonText: { fontSize: 16, fontWeight: '600', color: '#666' },
   priceButtonTextActive: { color: colors.cream },
   sliderRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
+  radiusControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    marginTop: 6,
+  },
+  radiusButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.brown,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radiusButtonText: {
+    color: colors.cream,
+    fontSize: 20,
+    fontWeight: '700',
+    lineHeight: 22,
+  },
+  radiusValue: {
+    minWidth: 70,
+    textAlign: 'center',
+    fontWeight: '700',
+    color: colors.brown,
+  },
   track: {
     height: 8,
     backgroundColor: '#E0E0E0',
@@ -284,5 +424,11 @@ const styles = StyleSheet.create({
     color: colors.cream,
     fontWeight: '700',
     fontSize: 16,
+  },
+  loadingWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
 });

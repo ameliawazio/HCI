@@ -13,25 +13,21 @@ import { useManeCourse } from '../context/ManeCourseContext';
 import { colors, radii, spacing } from '../constants/theme';
 
 export default function PersonalSettingsScreen() {
-  const { currentUser, updateCurrentUser } = useManeCourse();
+  const { currentUser, logout } = useManeCourse();
   const [isEditing, setIsEditing] = useState(false);
-  const [fullName, setFullName] = useState(currentUser.fullName);
-  const [username, setUsername] = useState(currentUser.username);
-  const [email, setEmail] = useState(currentUser.email);
+  const [fullName, setFullName] = useState(currentUser?.fullName || '');
+  const [username, setUsername] = useState(currentUser?.username || '');
+  const [email, setEmail] = useState(currentUser?.email || '');
   const [password, setPassword] = useState('********');
 
   useEffect(() => {
-    setFullName(currentUser.fullName);
-    setUsername(currentUser.username);
-    setEmail(currentUser.email);
+    setFullName(currentUser?.fullName || '');
+    setUsername(currentUser?.username || '');
+    setEmail(currentUser?.email || '');
   }, [currentUser]);
 
   const handleSave = () => {
-    updateCurrentUser({
-      fullName: fullName.trim() || currentUser.fullName,
-      username: username.trim() || currentUser.username,
-      email: email.trim() || currentUser.email,
-    });
+    // Profile updates are not wired to backend yet.
     setIsEditing(false);
   };
 
@@ -79,7 +75,13 @@ export default function PersonalSettingsScreen() {
             <Text style={styles.saveBtnText}>Save Changes</Text>
           </Pressable>
         )}
-        <Pressable style={styles.logoutBtn} onPress={() => router.replace('/')}>
+        <Pressable
+          style={styles.logoutBtn}
+          onPress={() => {
+            logout();
+            router.replace('/');
+          }}
+        >
           <Text style={styles.logoutBtnText}>Logout</Text>
         </Pressable>
       </ScrollView>

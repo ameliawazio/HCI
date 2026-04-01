@@ -7,21 +7,38 @@ import { useManeCourse } from '../../../context/ManeCourseContext';
 import { colors, radii, spacing } from '../../../constants/theme';
 
 export default function WaitingScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const { resolveAfterWaiting } = useManeCourse();
+  const { id, roundId } = useLocalSearchParams<{ id: string; roundId?: string }>();
+  const { pollGroupResult } = useManeCourse();
 
   useFocusEffect(
     useCallback(() => {
-      const t = setTimeout(() => {
-        const next = resolveAfterWaiting();
-        if (next.winnerId) {
-          router.replace(`/group/${id}/match`);
-        } else {
-          router.replace(`/group/${id}/swipe`);
+      if (!id) return () => undefined;
+      let active = true;
+      const poll = async () => {
+        try {
+          const state = await pollGroupResult(id);
+          if (!active) return;
+          if (state.winner) {
+            router.replace(`/group/${id}/match`);
+            return;
+          }
+          if (state.activeRound && String(state.activeRound.id) !== String(roundId || '')) {
+            router.replace(`/group/${id}/swipe`);
+            return;
+          }
+        } catch {
+          // ignore transient errors while waiting
         }
-      }, 1800);
-      return () => clearTimeout(t);
-    }, [id, resolveAfterWaiting]),
+      };
+      const handle = setInterval(() => {
+        void poll();
+      }, 2500);
+      void poll();
+      return () => {
+        active = false;
+        clearInterval(handle);
+      };
+    }, [id, pollGroupResult]),
   );
 
   const title =

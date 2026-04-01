@@ -1,12 +1,24 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useManeCourse } from '../context/ManeCourseContext';
 import { colors, radii, spacing } from '../constants/theme';
 
 export default function HomeScreen() {
-  const { groups, deleteGroup } = useManeCourse();
+  const { token, groups, deleteGroup, refreshGroups } = useManeCourse();
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!token) {
+        router.replace('/login');
+        return;
+      }
+      refreshGroups().catch(() => null);
+    }, [refreshGroups, token]),
+  );
 
   const handleDeleteGroup = (groupId: string, groupName: string) => {
     Alert.alert(
@@ -42,7 +54,7 @@ export default function HomeScreen() {
             <Pressable
               style={styles.cardMain}
               onPress={() => {
-                router.push(`/group/${g.id}/swipe`);
+                router.push(`/group/${g.id}/settings`);
               }}
             >
               <Image

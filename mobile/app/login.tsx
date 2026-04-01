@@ -12,10 +12,23 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { colors, radii } from '../constants/theme';
+import { useManeCourse } from '../context/ManeCourseContext';
 
 export default function LoginScreen() {
+  const { login, loading } = useManeCourse();
   const [user, setUser] = useState('');
   const [pass, setPass] = useState('');
+  const [error, setError] = useState('');
+
+  const handleLogin = async () => {
+    try {
+      setError('');
+      await login(user.trim(), pass);
+      router.replace('/home');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed');
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -56,9 +69,11 @@ export default function LoginScreen() {
           />
           <PrimaryButton
             title="Login"
-            onPress={() => router.replace('/home')}
+            onPress={handleLogin}
             style={styles.loginBtn}
           />
+          {!!error && <Text style={styles.errorText}>{error}</Text>}
+          {loading && <Text style={styles.loadingText}>Signing in...</Text>}
           <Text style={styles.forgot}>Forgot your password?</Text>
           <Pressable onPress={() => router.push('/login')}>
             <Text style={styles.link}>Click Here</Text>
@@ -135,6 +150,13 @@ const styles = StyleSheet.create({
   },
   loginBtn: { marginTop: 8, marginBottom: 24 },
   forgot: { color: colors.white, textAlign: 'center', fontSize: 13 },
+  errorText: {
+    color: '#FFE3E3',
+    textAlign: 'center',
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  loadingText: { color: colors.white, textAlign: 'center', marginBottom: 8 },
   link: {
     color: colors.white,
     textAlign: 'center',

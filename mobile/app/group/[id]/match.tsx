@@ -15,22 +15,24 @@ import { colors } from '../../../constants/theme';
 
 export default function MatchScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { session, getRestaurantsByIds, resetSession } = useManeCourse();
+  const { lastWinner, staleTieMessage, clearWinner, pollGroupResult } = useManeCourse();
   const [mapOpen, setMapOpen] = useState(false);
-
-  const list = getRestaurantsByIds(
-    session.winnerId ? [session.winnerId] : [],
-  );
-  const winner = list[0];
+  const winner = lastWinner;
 
   useEffect(() => {
-    if (session.staleTieMessage) {
+    if (!winner && id) {
+      pollGroupResult(id).catch(() => null);
+    }
+  }, [id, pollGroupResult, winner]);
+
+  useEffect(() => {
+    if (staleTieMessage) {
       Alert.alert(
         'Still tied',
         'The same restaurants tied again — we picked one so your group can eat!',
       );
     }
-  }, [session.staleTieMessage]);
+  }, [staleTieMessage]);
 
   if (!winner) {
     return (
@@ -79,7 +81,7 @@ export default function MatchScreen() {
       <Pressable
         style={styles.done}
         onPress={() => {
-          resetSession();
+          clearWinner();
           router.replace('/home');
         }}
       >
@@ -91,7 +93,7 @@ export default function MatchScreen() {
         onClose={() => setMapOpen(false)}
         restaurantName={winner.name}
         miles={winner.miles}
-        address="1680 W University Ave, Ste 20"
+        address={winner.address || 'Address unavailable'}
       />
     </SafeAreaView>
   );
