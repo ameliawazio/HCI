@@ -9,7 +9,10 @@ from functools import wraps
 from typing import Any
 
 import requests
+from dotenv import load_dotenv
 from flask import Flask, g, jsonify, render_template, request
+
+load_dotenv()
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "manecourse.db")
 PLACES_API_KEY = os.environ.get("GOOGLE_PLACES_API_KEY", "")
@@ -262,7 +265,12 @@ def abort_active_rounds_for_group(group_id: int) -> None:
         "SELECT id FROM rounds WHERE group_id = ? AND status = 'active'",
         (group_id,),
     ).fetchall()
+    app.logger.info("abort_active_rounds_for_group(%s): deleting %d active round(s): %s",
+                     group_id, len(rows), [r["id"] for r in rows])
     for row in rows:
+        db.execute("DELETE FROM round_restaurants WHERE round_id = ?", (row["id"],))
+        db.execute("DELETE FROM round_participants WHERE round_id = ?", (row["id"],))
+        db.execute("DELETE FROM votes WHERE round_id = ?", (row["id"],))
         db.execute("DELETE FROM rounds WHERE id = ?", (row["id"],))
     db.commit()
 
@@ -349,6 +357,7 @@ def _append_place_results(
     out: list[dict[str, Any]],
 ) -> None:
     cuisine_terms = {c.lower().strip() for c in cuisines if c.strip()}
+    app.logger.debug("Cuisine filter terms: %s", cuisine_terms)
     for r in raw_results:
         place_id = r.get("place_id")
         geom = (r.get("geometry") or {}).get("location") or {}
@@ -362,9 +371,18 @@ def _append_place_results(
         name = r.get("name") or "Unknown restaurant"
         types = [t.replace("_", " ") for t in r.get("types", [])]
         all_terms = {name.lower(), *[t.lower() for t in types]}
-        if cuisine_terms and not any(
+        matched = not cuisine_terms or any(
             any(ct in term for term in all_terms) for ct in cuisine_terms
-        ):
+        )
+        app.logger.debug(
+            "  [%s] %s | types=%s | all_terms=%s | matched=%s",
+            "KEEP" if matched else "SKIP",
+            name,
+            types,
+            all_terms,
+            matched,
+        )
+        if not matched:
             continue
 
         seen_ids.add(place_id)
@@ -422,33 +440,53 @@ def search_nearby_places(
     url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
     seen_ids: set[str] = set()
     results: list[dict[str, Any]] = []
-    pagetoken: str | None = None
 
-    for _ in range(8):
-        params = dict(base_params)
-        if pagetoken:
-            params["pagetoken"] = pagetoken
-        resp = requests.get(url, params=params, timeout=15)
-        resp.raise_for_status()
-        payload = resp.json()
-        st = payload.get("status")
-        if st not in {"OK", "ZERO_RESULTS"}:
-            raise RuntimeError(payload.get("error_message") or str(st))
+    # Use Google's keyword param for each cuisine so results are actually relevant.
+    # If no cuisines are specified (or too many — meaning "no preference"), do one broad search.
+    cuisine_keywords = [c.strip() for c in cuisines if c.strip()]
+    # Treat 6+ cuisines as "no real filter" — just do a broad search.
+    if len(cuisine_keywords) >= 6:
+        cuisine_keywords = []
 
-        _append_place_results(
-            payload.get("results") or [],
-            latitude,
-            longitude,
-            cuisines,
-            seen_ids,
-            results,
-        )
-        if len(results) >= min_results:
-            break
-        pagetoken = payload.get("next_page_token")
-        if not pagetoken:
-            break
-        time.sleep(2.0)
+    if not cuisine_keywords:
+        # Single broad search with no keyword
+        cuisine_keywords = [""]
+
+    # Distribute target evenly across cuisines so we get variety
+    per_cuisine = max(5, min_results // len(cuisine_keywords)) if len(cuisine_keywords) > 1 else min_results
+
+    for keyword in cuisine_keywords:
+        pagetoken: str | None = None
+        cuisine_count = sum(1 for r in results if True)  # current total
+        target_for_this = cuisine_count + per_cuisine
+        for _ in range(3):
+            params = dict(base_params)
+            if keyword:
+                params["keyword"] = keyword
+            if pagetoken:
+                params["pagetoken"] = pagetoken
+            app.logger.debug("Places API request: keyword=%r params=%s", keyword, {k: v for k, v in params.items() if k != "key"})
+            resp = requests.get(url, params=params, timeout=15)
+            resp.raise_for_status()
+            payload = resp.json()
+            st = payload.get("status")
+            if st not in {"OK", "ZERO_RESULTS"}:
+                raise RuntimeError(payload.get("error_message") or str(st))
+
+            _append_place_results(
+                payload.get("results") or [],
+                latitude,
+                longitude,
+                [],  # no post-hoc filtering — Google keyword does the filtering
+                seen_ids,
+                results,
+            )
+            if len(results) >= target_for_this:
+                break
+            pagetoken = payload.get("next_page_token")
+            if not pagetoken:
+                break
+            time.sleep(2.0)
 
     results.sort(key=lambda x: (x["distanceMiles"], x["placeId"]))
     return results
@@ -867,11 +905,12 @@ def update_group_settings(group_id: int):
     if int(group["host_user_id"]) != int(g.current_user["id"]):
         return jsonify({"error": "Only the group leader can edit group settings."}), 403
     data = request.get_json(silent=True) or {}
+    app.logger.info("update_group_settings(%s) payload: %s", group_id, data)
     name = (data.get("name") or group["name"]).strip()
     radius = float(data.get("radiusMiles") or group["radius_miles"])
     price_min = int(data.get("priceMin") or group["price_min"])
     price_max = int(data.get("priceMax") or group["price_max"])
-    cuisines = data.get("cuisines") or json.loads(group["cuisines_json"] or "[]")
+    cuisines = data.get("cuisines") if data.get("cuisines") is not None else json.loads(group["cuisines_json"] or "[]")
 
     if radius <= 0:
         return jsonify({"error": "radiusMiles must be > 0"}), 400
@@ -997,6 +1036,7 @@ def start_round(group_id: int):
         "price_max": int(group["price_max"]),
         "cuisines": json.loads(group["cuisines_json"] or "[]"),
     }
+    app.logger.info("Starting round for group %s — settings from DB: %s", group_id, settings)
     wanted_count = deck_size_for_member_count(member_count)
     attempt_configs = [
         # 1) Strictly honor all user settings.
@@ -1222,6 +1262,6 @@ def handle_options(_path: str):
 
 if __name__ == "__main__":
     init_db()
-    app.run(debug=True)
+    app.run(host="0.0.0.0", debug=True)
 else:
     init_db()

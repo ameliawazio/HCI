@@ -75,7 +75,7 @@ export default function GroupSettingsScreen() {
           setRadius(res.group.settings.radiusMiles);
           setPriceRange(res.group.settings.priceMax);
           setPriceMin(res.group.settings.priceMin);
-          setSelectedCuisines(new Set(res.group.settings.cuisines));
+          setSelectedCuisines(new Set(res.group.settings.cuisines.filter((c: string) => CUISINES.includes(c))));
           setYouAreHost(res.group.youAreHost ?? false);
         })
         .catch((err) => {
