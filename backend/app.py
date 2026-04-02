@@ -348,25 +348,50 @@ def get_round_deck(round_id: int) -> list[dict[str, Any]]:
     ]
 
 
-def _guess_cuisine_label(types: list[str], keyword: str | None) -> str:
-    generic_types = {
-        "restaurant",
-        "food",
-        "establishment",
-        "point of interest",
+def _guess_cuisine_label(name: str, types: list[str], keyword: str | None) -> str:
+    cuisine_types = {
+        "mexican": "Mexican",
+        "taco": "Mexican",
+        "burrito": "Mexican",
+        "italian": "Italian",
+        "pizza": "Italian",
+        "pizzeria": "Italian",
+        "japanese": "Japanese",
+        "sushi": "Japanese",
+        "ramen": "Japanese",
+        "thai": "Thai",
+        "chinese": "Chinese",
+        "indian": "Indian",
+        "mediterranean": "Mediterranean",
+        "greek": "Mediterranean",
+        "burger": "American",
+        "hamburger": "American",
+        "american": "American",
+        "seafood": "Seafood",
+        "fish": "Seafood",
+        "bbq": "Barbecue",
+        "barbecue": "Barbecue",
     }
 
-    for t in types:
-        normalized = t.strip().lower()
-        if not normalized or normalized in generic_types:
-            continue
-        if normalized.endswith(" restaurant"):
-            normalized = normalized[: -len(" restaurant")]
-        if normalized:
-            return normalized.title()
+    def normalize(s: str) -> str:
+        return s.lower().strip()
+    
+    candidates: list[str] = []
+    if keyword:
+        candidates.append(keyword)
+    candidates.append(name)
+    candidates.extend(types)
 
-    if keyword and keyword.strip():
-        return keyword.strip().title()
+
+    for c in candidates:
+        text = normalize(c)
+        if not text:
+
+            continue
+
+        for term, label in cuisine_types.items():
+            if term in text:
+                return label
 
     return "Restaurant"
 
@@ -394,24 +419,22 @@ def _append_place_results(
 
         name = r.get("name") or "Unknown restaurant"
         types = [t.replace("_", " ") for t in r.get("types", [])]
-        all_terms = {name.lower(), *[t.lower() for t in types]}
-        matched = not cuisine_terms or any(
-            any(ct in term for term in all_terms) for ct in cuisine_terms
-        )
+        cuisine_guess = _guess_cuisine_label(name, types, keyword)
+
+        matched = not cuisine_terms or cuisine_guess.lower() in cuisine_terms
         app.logger.debug(
             "  [%s] %s | types=%s | all_terms=%s | matched=%s",
             "KEEP" if matched else "SKIP",
             name,
             types,
-            all_terms,
+            cuisine_guess,
             matched,
         )
         if not matched:
             continue
 
         seen_ids.add(place_id)
-        distance = haversine_miles(latitude, longitude, float(lat), float(lng))
-        cuisine_guess = _guess_cuisine_label(types, keyword)
+        distance = haversine_miles(latitude, longitude, float(lat), float(lng))    
         photo_ref = ((r.get("photos") or [{}])[0]).get("photo_reference")
         photo_url = (
             f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference={photo_ref}&key={PLACES_API_KEY}"
@@ -498,7 +521,7 @@ def search_nearby_places(
                 payload.get("results") or [],
                 latitude,
                 longitude,
-                [],  # no post-hoc filtering — Google keyword does the filtering
+                cuisines,
                 keyword,
                 seen_ids,
                 results,
