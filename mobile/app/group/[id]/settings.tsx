@@ -303,7 +303,7 @@ export default function GroupSettingsScreen() {
           ))}
         </View>
         <TextInput
-          style={[styles.input, controlsDisabled && styles.inputDisabled]}
+          style={[styles.input, styles.addMemberInput, controlsDisabled && styles.inputDisabled]}
           placeholder="Add member..."
           placeholderTextColor={colors.greyText}
           value={addUser}
@@ -386,6 +386,9 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: 60,
     alignSelf: 'center',
+    backgroundColor: '#F0F0F0',
+    borderWidth: 3,
+    borderColor: colors.brown,
   },
   editPic: {
     textAlign: 'center',
@@ -400,6 +403,9 @@ const styles = StyleSheet.create({
     padding: 12,
     borderWidth: 1,
     borderColor: '#EEE',
+  },
+  addMemberInput: {
+    marginTop: spacing.lg,
   },
   dollars: { fontSize: 28, fontWeight: '800', letterSpacing: 4 },
   priceRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
