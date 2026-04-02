@@ -348,11 +348,35 @@ def get_round_deck(round_id: int) -> list[dict[str, Any]]:
     ]
 
 
+def _guess_cuisine_label(types: list[str], keyword: str | None) -> str:
+    generic_types = {
+        "restaurant",
+        "food",
+        "establishment",
+        "point of interest",
+    }
+
+    for t in types:
+        normalized = t.strip().lower()
+        if not normalized or normalized in generic_types:
+            continue
+        if normalized.endswith(" restaurant"):
+            normalized = normalized[: -len(" restaurant")]
+        if normalized:
+            return normalized.title()
+
+    if keyword and keyword.strip():
+        return keyword.strip().title()
+
+    return "Restaurant"
+
+
 def _append_place_results(
     raw_results: list[dict[str, Any]],
     latitude: float,
     longitude: float,
     cuisines: list[str],
+    keyword: str | None,
     seen_ids: set[str],
     out: list[dict[str, Any]],
 ) -> None:
@@ -387,10 +411,7 @@ def _append_place_results(
 
         seen_ids.add(place_id)
         distance = haversine_miles(latitude, longitude, float(lat), float(lng))
-        cuisine_guess = next(
-            (t for t in types if "restaurant" in t and t != "restaurant"),
-            "Restaurant",
-        )
+        cuisine_guess = _guess_cuisine_label(types, keyword)
         photo_ref = ((r.get("photos") or [{}])[0]).get("photo_reference")
         photo_url = (
             f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference={photo_ref}&key={PLACES_API_KEY}"
@@ -405,7 +426,7 @@ def _append_place_results(
                 "latitude": float(lat),
                 "longitude": float(lng),
                 "priceLevel": r.get("price_level"),
-                "cuisine": cuisine_guess.title(),
+                "cuisine": cuisine_guess,
                 "photoUrl": photo_url,
                 "placeUrl": f"https://www.google.com/maps/place/?q=place_id:{place_id}",
                 "distanceMiles": round(distance, 2),
@@ -478,6 +499,7 @@ def search_nearby_places(
                 latitude,
                 longitude,
                 [],  # no post-hoc filtering — Google keyword does the filtering
+                keyword,
                 seen_ids,
                 results,
             )

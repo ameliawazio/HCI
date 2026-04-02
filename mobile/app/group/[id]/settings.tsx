@@ -284,7 +284,7 @@ export default function GroupSettingsScreen() {
 
         <Text style={styles.label}>Group Members</Text>
         <Text style={styles.hint}>
-          Members are added by username only (no open join).
+          Members are added by username only.
         </Text>
         <View style={styles.chips}>
           {members.map((m) => (
@@ -326,27 +326,27 @@ export default function GroupSettingsScreen() {
           }}
         />
 
-        {normalizedId !== 'new' && (
-          <Pressable
-            style={styles.joinSwipeBtn}
-            onPress={() => router.push(`/group/${normalizedId}/swipe`)}
-          >
-            <Text style={styles.joinSwipeText}>Open swipe screen</Text>
-          </Pressable>
-        )}
         {normalizedId === 'new' ? (
           <Pressable style={styles.createButton} onPress={handleCreateGroup} disabled={saving}>
             <Text style={styles.createButtonText}>{saving ? 'Creating...' : 'Create Group'}</Text>
           </Pressable>
         ) : (
           <Pressable
-            style={[styles.createButton, controlsDisabled && styles.createButtonDisabled]}
+            style={[styles.createButton, styles.createButtonExisting, controlsDisabled && styles.createButtonDisabled]}
             onPress={handleSaveExisting}
             disabled={saving || controlsDisabled}
           >
             <Text style={styles.createButtonText}>
               {saving ? 'Saving...' : youAreHost ? 'Save & Start Swiping' : 'Leader starts swiping'}
             </Text>
+          </Pressable>
+        )}
+        {normalizedId !== 'new' && (
+          <Pressable
+            style={styles.joinSwipeBtn}
+            onPress={() => router.push(`/group/${normalizedId}/swipe`)}
+          >
+            <Text style={styles.joinSwipeText}>Exit</Text>
           </Pressable>
         )}
       </ScrollView>
@@ -485,15 +485,15 @@ const styles = StyleSheet.create({
   minus: { fontWeight: '800', color: '#C00' },
   hint: { fontSize: 12, color: colors.greyText, marginBottom: 8 },
   joinSwipeBtn: {
-    marginTop: spacing.md,
-    paddingVertical: 12,
+    marginTop: 2,
+    paddingVertical: spacing.md,
+    minHeight: 52,
     borderRadius: radii.card,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.brown,
+    backgroundColor: colors.red,
   },
   joinSwipeText: {
-    color: colors.brown,
+    color: colors.white,
     fontWeight: '700',
     fontSize: 15,
   },
@@ -502,8 +502,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     backgroundColor: colors.brown,
     paddingVertical: spacing.md,
+    minHeight: 52,
     borderRadius: radii.card,
     alignItems: 'center',
+  },
+  createButtonExisting: {
+    marginBottom: 2,
   },
   createButtonText: {
     color: colors.cream,

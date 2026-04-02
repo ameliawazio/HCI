@@ -154,7 +154,7 @@ export default function SwipeScreen() {
       <SafeAreaView style={styles.safe}>
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="large" color={colors.brown} />
-          <Text style={styles.loading}>Loading real nearby restaurants…</Text>
+          <Text style={styles.loading}>Loading nearby restaurants…</Text>
         </View>
       </SafeAreaView>
     );
@@ -301,7 +301,7 @@ export default function SwipeScreen() {
           style={styles.swipeOnlyBar}
           onPress={() => router.replace(`/group/${normalizedId}/swipe`)}
         >
-          <Text style={styles.swipeOnlyBarText}>Open swipe screen</Text>
+          <Text style={styles.swipeOnlyBarText}>Exit</Text>
         </Pressable>
       )}
 
@@ -429,7 +429,7 @@ const styles = StyleSheet.create({
   },
   swipeOnlyBar: {
     paddingVertical: 14,
-    backgroundColor: colors.brown,
+    backgroundColor: colors.red,
     borderTopWidth: 1,
     borderTopColor: '#DDD',
     alignItems: 'center',

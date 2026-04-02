@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet, Linking, Pressable } from 'react-native';
+import { View, Text, Image, StyleSheet, Linking, Pressable, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useManeCourse } from '../context/ManeCourseContext';
@@ -30,40 +30,44 @@ export default function RestaurantDetails() {
           <Text style={styles.back}>‹</Text>
         </Pressable>
       </View>
-      <View style={styles.container}>
-        <Text style={styles.name}>{restaurant.name}</Text>
-        {restaurant.imageUri && (
-          <Image
-            source={{ uri: restaurant.imageUri }}
-            style={styles.menuImg}
-            resizeMode="contain"
-          />
-        )}
-        {restaurant.placeUrl && (
-          <Pressable
-            style={styles.websiteBtn}
-            onPress={() => Linking.openURL(restaurant.placeUrl!)}
-          >
-            <Text style={styles.websiteText}>Open in Maps</Text>
-          </Pressable>
-        )}
-        <View style={styles.dietaryBox}>
-          <Text style={styles.dietaryTitle}>Cuisine:</Text>
-          <Text style={styles.dietaryText}>{restaurant.cuisine}</Text>
-        </View>
-        {!!restaurant.address && (
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.container}>
+          <Text style={styles.name}>{restaurant.name}</Text>
+          {restaurant.imageUri && (
+            <Image
+              source={{ uri: restaurant.imageUri }}
+              style={styles.menuImg}
+              resizeMode="contain"
+            />
+          )}
+          {restaurant.placeUrl && (
+            <Pressable
+              style={styles.websiteBtn}
+              onPress={() => Linking.openURL(restaurant.placeUrl!)}
+            >
+              <Text style={styles.websiteText}>Open in Maps</Text>
+            </Pressable>
+          )}
           <View style={styles.dietaryBox}>
-            <Text style={styles.dietaryTitle}>Address:</Text>
-            <Text style={styles.dietaryText}>{restaurant.address}</Text>
+            <Text style={styles.dietaryTitle}>Cuisine:</Text>
+            <Text style={styles.dietaryText}>{restaurant.cuisine}</Text>
           </View>
-        )}
-      </View>
+          {!!restaurant.address && (
+            <View style={styles.dietaryBox}>
+              <Text style={styles.dietaryTitle}>Address:</Text>
+              <Text style={styles.dietaryText}>{restaurant.address}</Text>
+            </View>
+          )}
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#fff' },
+  scroll: { flex: 1 },
+  scrollContent: { paddingBottom: 24 },
   topRow: {
     paddingHorizontal: 16,
     paddingTop: 8,
