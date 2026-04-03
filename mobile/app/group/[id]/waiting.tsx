@@ -1,7 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useManeCourse } from '../../../context/ManeCourseContext';
 import { colors, radii, spacing } from '../../../constants/theme';
@@ -55,8 +55,8 @@ export default function WaitingScreen() {
         </View>
       </View>
       <View style={styles.tabBar}>
-        <Text style={styles.tabItem}>👥 My Groups</Text>
-        <Text style={styles.tabItem}>✎ Group Settings</Text>
+        <Pressable style={styles.tabItem} onPress={()=>router.replace('/home')}><Text style={styles.tabIcon}>👥</Text><Text style={styles.tabLabel}>My Groups</Text></Pressable>
+        <Pressable style={styles.tabItem} onPress={()=>router.replace(`/group/${id}/settings`)}><Text style={styles.tabIcon}>✎</Text><Text style={styles.tabLabel}>Group Settings</Text></Pressable>
       </View>
     </SafeAreaView>
   );
@@ -94,10 +94,19 @@ const styles = StyleSheet.create({
     color: colors.brown,
   },
   tabBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingVertical: 12,
+    paddingTop: 20,
+    paddingBottom: 20,
     backgroundColor: '#EDE8E0',
+    borderTopWidth: 1,
+    borderTopColor: '#DDD',
   },
-  tabItem: { fontSize: 12 },
+  tabItem: { alignItems: 'center' },
+  tabIcon: {fontSize: 22},
+  tabLabel: { fontSize: 12, marginTop: 4, fontFamily: 'Georgia' },
 });

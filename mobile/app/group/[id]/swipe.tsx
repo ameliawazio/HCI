@@ -405,9 +405,9 @@ const styles = StyleSheet.create({
   selectedHint: { marginTop: 8, color: colors.greyText },
   actions: {
     flexDirection: 'row',
-    gap: 40,
+    gap: 50,
     marginTop: 'auto',
-    paddingBottom: spacing.lg,
+    paddingBottom: 100,
   },
   circle: {
     width: 72,
@@ -422,10 +422,15 @@ const styles = StyleSheet.create({
   tabBar: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingVertical: 12,
     backgroundColor: '#EDE8E0',
     borderTopWidth: 1,
     borderTopColor: '#DDD',
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingTop: 20,
+    paddingBottom: 20,
   },
   swipeOnlyBar: {
     paddingVertical: 14,
