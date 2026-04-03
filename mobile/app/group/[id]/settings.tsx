@@ -13,8 +13,9 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useManeCourse, MEMBER_USERNAMES } from '../../../context/ManeCourseContext';
+import { useManeCourse } from '../../../context/ManeCourseContext';
 import { colors, radii, spacing } from '../../../constants/theme';
+import { getApproxLocation } from '../../../lib/getApproxLocation';
 
 const CUISINES = [
   'American',
@@ -37,6 +38,8 @@ export default function GroupSettingsScreen() {
     getGroupSettings,
     saveGroupSettings,
     addMemberToGroup,
+    ensureActiveRound,
+    refreshGroups,
   } = useManeCourse();
   const normalizedId = Array.isArray(id) ? id[0] : id;
   const gid = normalizedId === 'new' ? 'new' : (normalizedId ?? '1');
@@ -55,8 +58,9 @@ export default function GroupSettingsScreen() {
   const [loading, setLoading] = useState(normalizedId !== 'new');
   const [trackWidth, setTrackWidth] = useState(1);
   const [youAreHost, setYouAreHost] = useState(normalizedId === 'new');
+  const [swipeInProgress, setSwipeInProgress] = useState(false);
 
-  const members = groupMembersByGroupId[gid] || MEMBER_USERNAMES.slice(0, 4);
+  const members = groupMembersByGroupId[gid] ?? [];
   const priceMax = priceRange;
   const controlsDisabled = normalizedId !== 'new' && !youAreHost;
 
@@ -77,6 +81,7 @@ export default function GroupSettingsScreen() {
           setPriceMin(res.group.settings.priceMin);
           setSelectedCuisines(new Set(res.group.settings.cuisines.filter((c: string) => CUISINES.includes(c))));
           setYouAreHost(res.group.youAreHost ?? false);
+          setSwipeInProgress(res.swipeInProgress ?? false);
         })
         .catch((err) => {
           Alert.alert('Failed to load settings', err instanceof Error ? err.message : 'Unknown error');
@@ -125,7 +130,8 @@ export default function GroupSettingsScreen() {
           priceMax,
           cuisines: [...selectedCuisines],
         });
-        router.replace(`/group/${newGroup.id}/swipe`);
+        await refreshGroups();
+        router.replace('/home');
       })
       .catch((err) => {
         Alert.alert('Failed to create group', err instanceof Error ? err.message : 'Unknown error');
@@ -148,6 +154,12 @@ export default function GroupSettingsScreen() {
         priceMax,
         cuisines: [...selectedCuisines],
       });
+      try {
+        const loc = await getApproxLocation();
+        await ensureActiveRound(normalizedId, loc, true);
+      } catch {
+        // Swipe screen will load or retry; navigation still happens below.
+      }
       router.replace(`/group/${normalizedId}/swipe`);
     } catch (err) {
       Alert.alert('Failed to save settings', err instanceof Error ? err.message : 'Unknown error');
@@ -170,7 +182,7 @@ export default function GroupSettingsScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.bar}>
-        <Pressable onPress={() => router.back()}>
+        <Pressable onPress={() => router.replace('/home')}>
           <Text style={styles.close}>×</Text>
         </Pressable>
         <Pressable>
@@ -330,23 +342,37 @@ export default function GroupSettingsScreen() {
           <Pressable style={styles.createButton} onPress={handleCreateGroup} disabled={saving}>
             <Text style={styles.createButtonText}>{saving ? 'Creating...' : 'Create Group'}</Text>
           </Pressable>
-        ) : (
+        ) : youAreHost ? (
           <Pressable
-            style={[styles.createButton, styles.createButtonExisting, controlsDisabled && styles.createButtonDisabled]}
+            style={[styles.createButton, styles.createButtonExisting]}
             onPress={handleSaveExisting}
-            disabled={saving || controlsDisabled}
+            disabled={saving}
           >
             <Text style={styles.createButtonText}>
-              {saving ? 'Saving...' : youAreHost ? 'Save & Start Swiping' : 'Leader starts swiping'}
+              {saving ? 'Saving...' : 'Save & Start Swiping'}
             </Text>
           </Pressable>
+        ) : (
+          <View style={styles.memberSwipeBlock}>
+            <Text style={styles.memberSwipeHint}>
+              {swipeInProgress
+                ? 'A swipe round is in progress — open the swiping screen to join.'
+                : 'No round has started yet. Wait for the leader to tap Save & Start Swiping, or open the swiping screen to check.'}
+            </Text>
+            <Pressable
+              style={styles.createButton}
+              onPress={() => router.push(`/group/${normalizedId}/swipe`)}
+            >
+              <Text style={styles.createButtonText}>Go to swiping</Text>
+            </Pressable>
+          </View>
         )}
         {normalizedId !== 'new' && (
           <Pressable
             style={styles.joinSwipeBtn}
-            onPress={() => router.push(`/group/${normalizedId}/swipe`)}
+            onPress={() => router.replace('/home')}
           >
-            <Text style={styles.joinSwipeText}>Exit</Text>
+            <Text style={styles.joinSwipeText}>Exit to My Groups</Text>
           </Pressable>
         )}
       </ScrollView>
@@ -508,6 +534,16 @@ const styles = StyleSheet.create({
   },
   createButtonExisting: {
     marginBottom: 2,
+  },
+  memberSwipeBlock: {
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  memberSwipeHint: {
+    fontSize: 14,
+    color: colors.greyText,
+    lineHeight: 20,
+    marginBottom: spacing.md,
   },
   createButtonText: {
     color: colors.cream,

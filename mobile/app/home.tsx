@@ -41,13 +41,20 @@ export default function HomeScreen() {
   const handleDeleteGroup = (groupId: string, groupName: string) => {
     Alert.alert(
       'Delete group?',
-      `Remove ${groupName}? This cannot be undone.`,
+      `Remove "${groupName}"? This cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => deleteGroup(groupId),
+          onPress: () => {
+            void deleteGroup(groupId).catch((err: unknown) => {
+              Alert.alert(
+                'Could not delete group',
+                err instanceof Error ? err.message : 'Unknown error',
+              );
+            });
+          },
         },
       ],
     );
@@ -96,12 +103,14 @@ export default function HomeScreen() {
                 <Text style={styles.cardSub}>{g.memberCount} members</Text>
               </View>
             </Pressable>
-            {g.youAreHost && (
+            {g.youAreHost === true && (
               <Pressable
                 style={styles.deleteHitArea}
                 onPress={() => handleDeleteGroup(g.id, g.name)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                accessibilityLabel={`Delete group ${g.name}`}
               >
-                <View style={styles.deleteLine} />
+                <Text style={styles.deleteIcon}>×</Text>
               </Pressable>
             )}
           </View>
@@ -167,15 +176,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   deleteHitArea: {
-    width: 22,
+    minWidth: 44,
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  deleteLine: {
-    width: 14,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: '#D84343',
+  deleteIcon: {
+    fontSize: 28,
+    color: '#D84343',
+    fontWeight: '300',
+    lineHeight: 32,
   },
   avatar: {
     width: 56,
