@@ -5,10 +5,10 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useManeCourse } from '../context/ManeCourseContext';
 
 const PRICE_LABELS: Record<1 | 2 | 3 | 4, string> = {
-  1: '$1-$10',
-  2: '$10-$20',
-  3: '$20-$30',
-  4: '$30+',
+  1: '($1-$10)',
+  2: '($10-$20)',
+  3: '($20-$35)',
+  4: '($35+)',
 };
 
 // Props: expects a restaurantId passed via navigation params

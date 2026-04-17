@@ -32,8 +32,8 @@ const CUISINES = [
 const PRICE_LEVELS = [
   { level: 1, symbols: '$', annotation: '($1-$10)' },
   { level: 2, symbols: '$$', annotation: '($10-$20)' },
-  { level: 3, symbols: '$$$', annotation: '($20-$30)' },
-  { level: 4, symbols: '$$$$', annotation: '($30+)' },
+  { level: 3, symbols: '$$$', annotation: '($20-$35)' },
+  { level: 4, symbols: '$$$$', annotation: '($35+)' },
 ];
 
 export default function GroupSettingsScreen() {

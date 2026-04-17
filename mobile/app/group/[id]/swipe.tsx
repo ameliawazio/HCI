@@ -16,10 +16,10 @@ import { useManeCourse, type Restaurant } from '../../../context/ManeCourseConte
 import { colors, radii, spacing } from '../../../constants/theme';
 
 const PRICE_LABELS: Record<1 | 2 | 3 | 4, string> = {
-  1: '$1-$10',
-  2: '$10-$20',
-  3: '$20-$30',
-  4: '$30+',
+  1: '($1-$10)',
+  2: '($10-$20)',
+  3: '($20-$35)',
+  4: '($35+)',
 };
 
 export default function SwipeScreen() {
