@@ -44,5 +44,12 @@ macOS / zsh:
   
 Then press `w` for web, scan the QR code for Expo Go, or use an emulator.
 
+## Testing from 1 Computer
+
+- open terminal, navigate to hci/backend, run instructions for backend setup, and start the server w/ 'python app.py'
+- open multiple terminals and navigate to hci/mobile to execute the mobile instructions
+- repeat mobile start on each different terminal (each one after the first will say 'port 8081 is being used by another process, would you like to use port 8082/8083/etc.' press 'Y' to confirm.
+- once you have multiple mobile pages running, login with a hardcoded account on each (gator1/2/3/4 etc), create a group with one and add the other accounts to it. Set group settings and begin swiping round from the group leader.
+
 **Implemented:** Expo Router screens matching the Figma flow (landing, login, sign up, My Groups, personal settings, group settings with add-by-username, swipe, waiting, match, map modal). Voting uses a demo deck size of `memberCount × 3` restaurants, simulated peer votes after you finish swiping, tie rounds with a second-round stale-tie alert, and no open “join group” (invite by username in group settings only).
 
