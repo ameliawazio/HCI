@@ -29,6 +29,13 @@ const CUISINES = [
   'Barbecue',
 ];
 
+const PRICE_LEVELS = [
+  { level: 1, symbols: '$', annotation: '($1-$10)' },
+  { level: 2, symbols: '$$', annotation: '($10-$20)' },
+  { level: 3, symbols: '$$$', annotation: '($20-$30)' },
+  { level: 4, symbols: '$$$$', annotation: '($30+)' },
+];
+
 export default function GroupSettingsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const {
@@ -203,23 +210,31 @@ export default function GroupSettingsScreen() {
 
         <Text style={styles.label}>Price Range</Text>
         <View style={styles.priceRow}>
-          {[1, 2, 3, 4].map((level) => (
+          {PRICE_LEVELS.map(({ level, symbols, annotation }) => (
             <Pressable
               key={level}
               onPress={() => setPriceRange(level)}
               disabled={controlsDisabled}
               style={[
                 styles.priceButton,
-                priceRange >= level && styles.priceButtonActive,
+                priceRange === level && styles.priceButtonActive,
               ]}
             >
               <Text
                 style={[
                   styles.priceButtonText,
-                  priceRange >= level && styles.priceButtonTextActive,
+                  priceRange === level && styles.priceButtonTextActive,
                 ]}
               >
-                $
+                {symbols}
+              </Text>
+              <Text
+                style={[
+                  styles.priceAnnotation,
+                  priceRange === level && styles.priceAnnotationActive,
+                ]}
+              >
+                {annotation}
               </Text>
             </Pressable>
           ))}
@@ -425,6 +440,15 @@ const styles = StyleSheet.create({
   },
   priceButtonText: { fontSize: 16, fontWeight: '600', color: '#666' },
   priceButtonTextActive: { color: colors.cream },
+  priceAnnotation: {
+    fontSize: 11,
+    marginTop: 4,
+    color: colors.greyText,
+    fontWeight: '500',
+  },
+  priceAnnotationActive: {
+    color: colors.cream,
+  },
   sliderRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
   radiusControls: {
     flexDirection: 'row',

@@ -4,11 +4,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useManeCourse } from '../context/ManeCourseContext';
 
+const PRICE_LABELS: Record<1 | 2 | 3 | 4, string> = {
+  1: '$1-$10',
+  2: '$10-$20',
+  3: '$20-$30',
+  4: '$30+',
+};
+
 // Props: expects a restaurantId passed via navigation params
 export default function RestaurantDetails() {
   const { restaurantId } = useLocalSearchParams<{ restaurantId: string }>();
   const { getRestaurantsByIds } = useManeCourse();
   const restaurant = restaurantId ? getRestaurantsByIds([restaurantId])[0] : undefined;
+  const priceLevel = ((restaurant?.priceLevel || 1) as 1 | 2 | 3 | 4);
 
   if (!restaurant) {
     return (
@@ -51,6 +59,10 @@ export default function RestaurantDetails() {
           <View style={styles.dietaryBox}>
             <Text style={styles.dietaryTitle}>Cuisine:</Text>
             <Text style={styles.dietaryText}>{restaurant.cuisine}</Text>
+          </View>
+          <View style={styles.dietaryBox}>
+            <Text style={styles.dietaryTitle}>Price:</Text>
+            <Text style={styles.dietaryText}>{'$'.repeat(priceLevel)} ({PRICE_LABELS[priceLevel]})</Text>
           </View>
           {!!restaurant.address && (
             <View style={styles.dietaryBox}>

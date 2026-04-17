@@ -15,6 +15,13 @@ import { MapModal } from '../../../components/MapModal';
 import { useManeCourse, type Restaurant } from '../../../context/ManeCourseContext';
 import { colors, radii, spacing } from '../../../constants/theme';
 
+const PRICE_LABELS: Record<1 | 2 | 3 | 4, string> = {
+  1: '$1-$10',
+  2: '$10-$20',
+  3: '$20-$30',
+  4: '$30+',
+};
+
 export default function SwipeScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const normalizedId = Array.isArray(id) ? id[0] : id;
@@ -244,6 +251,7 @@ export default function SwipeScreen() {
             </Text>
           ))}
         </View>
+        <Text style={styles.priceHint}>{PRICE_LABELS[current.priceLevel]}</Text>
         <Pressable
           style={styles.moreDetailsBtn}
           onPress={() =>
@@ -402,6 +410,12 @@ const styles = StyleSheet.create({
   dollar: { fontSize: 22, fontWeight: '800' },
   dollarOn: { color: '#2E7D32' },
   dollarOff: { color: '#111' },
+  priceHint: {
+    marginTop: 4,
+    color: colors.greyText,
+    fontSize: 12,
+    fontWeight: '600',
+  },
   selectedHint: { marginTop: 8, color: colors.greyText },
   actions: {
     flexDirection: 'row',
