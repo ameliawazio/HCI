@@ -905,7 +905,7 @@ def delete_group(group_id: int):
     group = ensure_group_member(group_id)
     if not group:
         return jsonify({"error": "Group not found"}), 404
-    if group["host_user_id"] != g.current_user["id"]:
+    if int(group["host_user_id"]) != int(g.current_user["id"]):
         return jsonify({"error": "Only host can delete group"}), 403
     db = get_db()
     db.execute("DELETE FROM groups WHERE id = ?", (group_id,))

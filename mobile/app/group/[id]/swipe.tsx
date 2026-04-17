@@ -14,6 +14,26 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MapModal } from '../../../components/MapModal';
 import { useManeCourse, type Restaurant } from '../../../context/ManeCourseContext';
 import { colors, radii, spacing } from '../../../constants/theme';
+import type { GroupSummary } from '../../../lib/api';
+import { getApproxLocation } from '../../../lib/getApproxLocation';
+
+/** Host when API says so, or when list/cache matches, or hostUserId === current user (handles missing flags). */
+function computeIsHost(
+  group: GroupSummary,
+  groupsList: { id: string; youAreHost?: boolean }[],
+  normalizedId: string,
+  currentUser: { id: number } | null,
+): boolean {
+  if (group.youAreHost === true) return true;
+  if (group.youAreHost === false) return false;
+  const fromList = groupsList.find((g) => g.id === normalizedId)?.youAreHost;
+  if (fromList === true) return true;
+  if (fromList === false) return false;
+  if (group.hostUserId != null && currentUser != null) {
+    return Number(group.hostUserId) === Number(currentUser.id);
+  }
+  return false;
+}
 
 const PRICE_LABELS: Record<1 | 2 | 3 | 4, string> = {
   1: '($1-$10)',
@@ -27,6 +47,8 @@ export default function SwipeScreen() {
   const normalizedId = Array.isArray(id) ? id[0] : id;
   const {
     groups,
+    currentUser,
+    refreshGroups,
     activeRound,
     roundVotes,
     getGroupSettings,
@@ -47,35 +69,10 @@ export default function SwipeScreen() {
     try {
       setLoading(true);
       setWaitingForLeader(false);
-      let latitude = 29.6516;
-      let longitude = -82.3248;
-      try {
-        const Location = await import('expo-location');
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status === 'granted') {
-          const loc = await Promise.race([
-            Location.getCurrentPositionAsync({
-              accuracy: Location.Accuracy.Balanced,
-              timeInterval: 1000,
-            }),
-            new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
-          ]);
-          if (loc) {
-            latitude = loc.coords.latitude;
-            longitude = loc.coords.longitude;
-          } else {
-            const last = await Location.getLastKnownPositionAsync();
-            if (last) {
-              latitude = last.coords.latitude;
-              longitude = last.coords.longitude;
-            }
-          }
-        }
-      } catch {
-        // Keep Gainesville fallback when location module/permission is unavailable.
-      }
+      const { latitude, longitude } = await getApproxLocation();
+      const freshGroups = await refreshGroups();
       const { group } = await getGroupSettings(normalizedId);
-      const isHost = group.youAreHost ?? false;
+      const isHost = computeIsHost(group, freshGroups, normalizedId, currentUser);
       const round = await ensureActiveRound(normalizedId, { latitude, longitude }, isHost);
       if (!round && !isHost) {
         setWaitingForLeader(true);
@@ -85,7 +82,7 @@ export default function SwipeScreen() {
     } finally {
       setLoading(false);
     }
-  }, [ensureActiveRound, getGroupSettings, normalizedId]);
+  }, [currentUser, ensureActiveRound, getGroupSettings, normalizedId, refreshGroups]);
 
   useFocusEffect(
     useCallback(() => {

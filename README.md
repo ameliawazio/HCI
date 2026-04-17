@@ -8,7 +8,9 @@ PowerShell:
 - `python -m venv .venv`
 - `.\.venv\Scripts\Activate.ps1`
 - `pip install -r requirements.txt`
-- `$env:GOOGLE_PLACES_API_KEY="your_google_places_key"`
+- Set your Places API key (pick one):
+  - **Persistent (recommended):** copy `backend/.env.example` to `backend/.env`, edit `GOOGLE_PLACES_API_KEY=...`, then run `python app.py` (`python-dotenv` loads `.env` automatically).
+  - **Per session:** `$env:GOOGLE_PLACES_API_KEY="your_google_places_key"` in PowerShell before `python app.py`.
 - `python app.py`
 
 macOS / zsh:
@@ -16,7 +18,7 @@ macOS / zsh:
 - `python3 -m venv .venv`
 - `source .venv/bin/activate`
 - `pip install -r requirements.txt`
-- `export GOOGLE_PLACES_API_KEY="your_google_places_key"`
+- Set `GOOGLE_PLACES_API_KEY` via `backend/.env` (copy from `.env.example`) or `export GOOGLE_PLACES_API_KEY="..."`.
 - `python3 app.py`
 
 Backend runs at:

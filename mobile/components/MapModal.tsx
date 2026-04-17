@@ -31,7 +31,7 @@ export function MapModal({
           </Pressable>
           <Text style={styles.distanceTitle}>{miles} miles away</Text>
           <View style={styles.mapBox}>
-            <Text style={styles.mapHint}>Map preview (Gainesville area)</Text>
+            <Text style={styles.mapHint}>Map preview</Text>
             <Text style={styles.pinLabel}>{restaurantName}</Text>
           </View>
           <Text style={styles.address}>{address}</Text>

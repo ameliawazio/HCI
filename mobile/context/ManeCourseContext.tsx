@@ -24,6 +24,7 @@ export type Restaurant = {
 };
 
 export type UserProfile = {
+  id: number;
   username: string;
   fullName: string;
   email: string;
@@ -58,7 +59,7 @@ type ManeCourseContextValue = {
     password: string;
   }) => Promise<void>;
   logout: () => void;
-  refreshGroups: () => Promise<void>;
+  refreshGroups: () => Promise<Group[]>;
   createGroup: (data: { name: string; members: string[] }) => Promise<Group>;
   deleteGroup: (groupId: string) => Promise<void>;
   getGroupSettings: (groupId: string) => Promise<{
@@ -105,8 +106,6 @@ type ManeCourseContextValue = {
 };
 
 const ManeCourseContext = createContext<ManeCourseContextValue | null>(null);
-
-export const MEMBER_USERNAMES = ["Bogi", "Olivia", "Lucas", "Zach", "Amelia"];
 
 function toGroup(g: GroupSummary): Group {
   return {
@@ -160,7 +159,9 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
   const refreshGroups = useCallback(async () => {
     const t = requireToken();
     const res = await api.listGroups(t);
-    setGroups(res.groups.map(toGroup));
+    const mapped = res.groups.map(toGroup);
+    setGroups(mapped);
+    return mapped;
   }, [requireToken]);
 
   useEffect(() => {
@@ -175,6 +176,7 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
             if (cancelled) return;
             setToken(t);
             setCurrentUser({
+              id: user.id,
               username: user.username,
               fullName: user.fullName,
               email: user.email,
@@ -201,6 +203,7 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
   const hydrateAuth = useCallback((authToken: string, user: AuthUser) => {
     setToken(authToken);
     setCurrentUser({
+      id: user.id,
       username: user.username,
       fullName: user.fullName,
       email: user.email,
@@ -312,7 +315,9 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
       const res = await api.updateGroupSettings(t, Number(groupId), payload);
       const updated = toGroup(res.group);
       setGroups((prev) => prev.map((g) => (g.id === groupId ? updated : g)));
-      setActiveRound((prev) => (prev?.groupId === groupId ? null : prev));
+      // Do not clear activeRound here — it races with ensureActiveRound right after save
+      // (React may apply the clear after captureDeck and wipe the new deck). The server
+      // already aborts old rounds; next ensureActiveRound / swipe load replaces client state.
       setRoundVotes({});
       setLastWinner(null);
       setStaleTieMessage(false);
