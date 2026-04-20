@@ -54,6 +54,7 @@ export default function SwipeScreen() {
     getGroupSettings,
     ensureActiveRound,
     recordSwipe,
+    removeSwipe,
     restaurantMap,
     submitAllVotes,
     completeRound,
@@ -63,6 +64,7 @@ export default function SwipeScreen() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [waitingForLeader, setWaitingForLeader] = useState(false);
+  const [undoTooltip, setUndoTooltip] = useState(false);
 
   const loadSwipeRound = useCallback(async () => {
     if (!normalizedId || normalizedId === 'new') return;
@@ -120,6 +122,13 @@ export default function SwipeScreen() {
     groups.find((g) => g.id === normalizedId)?.name ?? 'Group';
   const youAreHost =
     groups.find((g) => g.id === normalizedId)?.youAreHost ?? false;
+
+  const onUndo = () => {
+    if (index === 0 || !activeRound) return;
+    const prevPlaceId = activeRound.deck[index - 1].placeId;
+    removeSwipe(prevPlaceId);
+    setIndex((i) => i - 1);
+  };
 
   const onChoice = async (like: boolean) => {
     if (!current) return;
@@ -310,6 +319,29 @@ export default function SwipeScreen() {
         </Pressable>
       )}
 
+      {index > 0 && (
+        <View style={styles.undoWrap} pointerEvents="box-none">
+          {undoTooltip && (
+            <View style={styles.undoTooltip}>
+              <Text style={styles.undoTooltipText}>Swiping too fast? Reswipe the last restaurant</Text>
+            </View>
+          )}
+          <Pressable
+            style={({ pressed }) => [
+              styles.undoBtn,
+              pressed && { opacity: 0.75 },
+            ]}
+            onPress={onUndo}
+            // @ts-ignore – web-only hover props
+            onHoverIn={() => setUndoTooltip(true)}
+            onHoverOut={() => setUndoTooltip(false)}
+            disabled={submitting}
+          >
+            <Text style={styles.undoBtnText}>↩</Text>
+          </Pressable>
+        </View>
+      )}
+
       <MapModal
         visible={mapOpen}
         onClose={() => setMapOpen(false)}
@@ -460,4 +492,24 @@ const styles = StyleSheet.create({
   tabItem: { alignItems: 'center' },
   tabIcon: { fontSize: 22 },
   tabLabel: { fontSize: 12, marginTop: 4, fontFamily: 'Georgia' },
+  undoWrap: {
+    position: 'absolute',
+    bottom: 100,
+    right: 36,
+    alignItems: 'flex-end',
+  },
+  undoBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  undoBtnText: { fontSize: 36, color: colors.brown },
+  undoTooltip: {
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 8,
+    maxWidth: 220,
+  },
+  undoTooltipText: { color: '#fff', fontSize: 13, textAlign: 'center' },
 });

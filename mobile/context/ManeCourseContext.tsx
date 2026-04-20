@@ -92,6 +92,7 @@ type ManeCourseContextValue = {
     canStartRound: boolean,
   ) => Promise<ActiveRound | null>;
   recordSwipe: (placeId: string, liked: boolean) => void;
+  removeSwipe: (placeId: string) => void;
   /** Merges `includeVotes` on top of current round votes (use for the last card — React state is not updated yet). */
   submitAllVotes: (includeVotes?: Record<string, boolean>) => Promise<void>;
   completeRound: () => Promise<{
@@ -399,6 +400,14 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
     setRoundVotes((prev) => ({ ...prev, [placeId]: liked }));
   }, []);
 
+  const removeSwipe = useCallback((placeId: string) => {
+    setRoundVotes((prev) => {
+      const next = { ...prev };
+      delete next[placeId];
+      return next;
+    });
+  }, []);
+
   const submitAllVotes = useCallback(
     async (includeVotes?: Record<string, boolean>) => {
       const t = requireToken();
@@ -496,6 +505,7 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
       cancelActiveRound,
       ensureActiveRound,
       recordSwipe,
+      removeSwipe,
       submitAllVotes,
       completeRound,
       pollGroupResult,
@@ -526,6 +536,7 @@ export function ManeCourseProvider({ children }: { children: React.ReactNode }) 
       cancelActiveRound,
       ensureActiveRound,
       recordSwipe,
+      removeSwipe,
       submitAllVotes,
       completeRound,
       pollGroupResult,
