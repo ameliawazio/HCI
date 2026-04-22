@@ -4,6 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
 import {
   Alert,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -38,7 +39,32 @@ export default function HomeScreen() {
       .finally(() => setRefreshing(false));
   }, [refreshGroups, token]);
 
+  const performDeleteGroup = useCallback(
+    async (groupId: string) => {
+      try {
+        await deleteGroup(groupId);
+      } catch (err) {
+        Alert.alert(
+          'Could not delete group',
+          err instanceof Error ? err.message : 'Unknown error',
+        );
+      }
+    },
+    [deleteGroup],
+  );
+
   const handleDeleteGroup = (groupId: string, groupName: string) => {
+    if (Platform.OS === 'web') {
+      const confirmed =
+        typeof globalThis.confirm === 'function'
+          ? globalThis.confirm(`Remove "${groupName}"? This cannot be undone.`)
+          : false;
+      if (confirmed) {
+        void performDeleteGroup(groupId);
+      }
+      return;
+    }
+
     Alert.alert(
       'Delete group?',
       `Remove "${groupName}"? This cannot be undone.`,
@@ -48,12 +74,7 @@ export default function HomeScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
-            void deleteGroup(groupId).catch((err: unknown) => {
-              Alert.alert(
-                'Could not delete group',
-                err instanceof Error ? err.message : 'Unknown error',
-              );
-            });
+            void performDeleteGroup(groupId);
           },
         },
       ],
